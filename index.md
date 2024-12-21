@@ -49,11 +49,12 @@ learning the bass guitar, playing with my dog (Bert), and enjoying a relaxing me
   - Time Series Analysis & Stochastic Modeling
   - Quantitative Trading & Algorithmic Strategies
 
-## Teaching Assistant Experience
+## Teaching Experience
 
 - **Courses:**
   - (Fall 2024) CS 250: Foundations of Computer Systems 
     - CS250 covers foundational aspects of computer systems encompassing processors, networks, storage, and computing frameworks. A holistic understanding these constructs is key to designing systems (AI, Big Data, clouds, and security) that scale by surfacing problems and solutions from different vantage points. The course includes a discussion of processors, cores, and co-processors (GPUs). Speed differentials across the memory hierarchy and the implications of caching will be covered as well. The discussion of the memory subsystem is complemented with the design of data structures for storage systems. Core foundations of networking including the design of the key elements of the networking stack (IP, TCP, and UDP) will be covered alongside a discussion of DNS and BGP. Current state of the art computing systems are based on parallel and distributed computing frameworks; the course includes an overview of these systems. Finally, the course ends with a future gazing component that explores new, promising systems on the horizon with an emphasis on neuromorphic computing.
+- [Tutoring](https://www.wyzant.com/Tutors/dktutorsforfun)
 
 ## Bert
 <img src="./assets/img/bert.jpg" alt="bert" width="200">
