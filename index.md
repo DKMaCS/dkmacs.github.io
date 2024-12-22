@@ -27,13 +27,13 @@ learning the bass guitar, playing with my dog (Bert), and enjoying a relaxing me
 ## News
 
 - **[Aug. 2024]** Began my CS PhD journey @ CSU
-- **[May. 2023]** Completed MS in Mathematical Sciences @ NYU
+- **[May 2023]** Completed MS in Mathematical Sciences @ NYU
 
 ## Coding Skills
 
 - **Languages:** Python, Java, C, R, SQL
-- **Platforms/Tools:** AWS, Docker, Kubernetes, PyCharm, IntelliJ, RStudio, emacs
-- **Libraries:** SciPy, NumPy, Pandas, Scikit-learn, Statsmodels, Selenium, PyTorch, cvxpy, pymc3
+- **Platforms/Tools:** AWS, PyCharm, IntelliJ, RStudio, emacs
+- **Libraries:** SciPy, NumPy, Pandas, Keras, Scikit-learn, Statsmodels, Selenium, cvxpy
 - **Paradigms:** OOP/SOLID
 
 ## Academics
