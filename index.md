@@ -10,14 +10,12 @@ techniques at the intersection of computer science, mathematics, operations rese
 Generally speaking, I'm fascinated by how we interact with our environment, each other, and the 
 technologies we create to solve our problems. 
 </div>
-<br>
 
 <div style="text-align: justify;">
 I am seeking Summer, or part-time, internships that provide challenging problems and the opportunity to 
 construct impactful strategies based on quantitative and qualitative best practices. Ultimately, I aspire
 to join an organization that shares my professional interests with a pioneering work culture. 
 </div>
-<br>
 
 <div style="text-align: justify;">
 Outside of academics, I enjoy cooking (slow-cooking/neopolitan style pizzas), playing the cello,
