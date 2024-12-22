@@ -4,6 +4,7 @@ layout: homepage
 
 ## About Me
 
+<div align="justify">
 I am a first-year PhD student at Colorado State University, focusing on decision sciences by leveraging
 techniques at the intersection of computer science, mathematics, operations research, and statistics.
 Generally speaking, I'm fascinated by how we interact with our environment, each other, and the 
@@ -15,7 +16,7 @@ to join an organization that shares my professional interests with a pioneering 
 
 Outside of academics, I enjoy cooking (slow-cooking/neopolitan style pizzas), playing the cello,
 learning the bass guitar, playing with my dog (Bert), and enjoying a relaxing meal on the patio.
-
+</div>
 
 ## Research Interests
 
