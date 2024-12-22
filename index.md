@@ -4,6 +4,7 @@ layout: homepage
 
 ## About Me
 
+<div style="text-align: justify;">
 I am a first-year PhD student at Colorado State University, focusing on decision sciences by leveraging
 techniques at the intersection of computer science, mathematics, operations research, and statistics.
 Generally speaking, I'm fascinated by how we interact with our environment, each other, and the 
@@ -15,6 +16,7 @@ to join an organization that shares my professional interests with a pioneering 
 
 Outside of academics, I enjoy cooking (slow-cooking/neopolitan style pizzas), playing the cello,
 learning the bass guitar, playing with my dog (Bert), and enjoying a relaxing meal on the patio. 
+</div>
 
 ## Research Interests
 
@@ -55,7 +57,9 @@ learning the bass guitar, playing with my dog (Bert), and enjoying a relaxing me
 
 - **Courses:**
   - (Fall 2024) CS 250: Foundations of Computer Systems 
-    - CS250 covers foundational aspects of computer systems encompassing processors, networks, storage, and computing frameworks. A holistic understanding these constructs is key to designing systems (AI, Big Data, clouds, and security) that scale by surfacing problems and solutions from different vantage points. The course includes a discussion of processors, cores, and co-processors (GPUs). Speed differentials across the memory hierarchy and the implications of caching will be covered as well. The discussion of the memory subsystem is complemented with the design of data structures for storage systems. Core foundations of networking including the design of the key elements of the networking stack (IP, TCP, and UDP) will be covered alongside a discussion of DNS and BGP. Current state of the art computing systems are based on parallel and distributed computing frameworks; the course includes an overview of these systems. Finally, the course ends with a future gazing component that explores new, promising systems on the horizon with an emphasis on neuromorphic computing.
+      <div style="text-align: justify;">  
+      CS250 covers foundational aspects of computer systems encompassing processors, networks, storage, and computing frameworks. A holistic understanding these constructs is key to designing systems (AI, Big Data, clouds, and security) that scale by surfacing problems and solutions from different vantage points. The course includes a discussion of processors, cores, and co-processors (GPUs). Speed differentials across the memory hierarchy and the implications of caching will be covered as well. The discussion of the memory subsystem is complemented with the design of data structures for storage systems. Core foundations of networking including the design of the key elements of the networking stack (IP, TCP, and UDP) will be covered alongside a discussion of DNS and BGP. Current state of the art computing systems are based on parallel and distributed computing frameworks; the course includes an overview of these systems. Finally, the course ends with a future gazing component that explores new, promising systems on the horizon with an emphasis on neuromorphic computing.
+      </div>
 - [Tutoring](https://www.wyzant.com/Tutors/dktutorsforfun)
 
 ## Bert
