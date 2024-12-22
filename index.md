@@ -11,16 +11,19 @@ Generally speaking, I'm fascinated by how we interact with our environment, each
 technologies we create to solve our problems. 
 </div>
 
+
 <div style="text-align: justify;">
 I am seeking Summer, or part-time, internships that provide challenging problems and the opportunity to 
 construct impactful strategies based on quantitative and qualitative best practices. Ultimately, I aspire
 to join an organization that shares my professional interests with a pioneering work culture. 
 </div>
 
+
 <div style="text-align: justify;">
 Outside of academics, I enjoy cooking (slow-cooking/neopolitan style pizzas), playing the cello,
 learning the bass guitar, playing with my dog (Bert), and enjoying a relaxing meal on the patio. 
 </div>
+
 
 ## Research Interests
 
