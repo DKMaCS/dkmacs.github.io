@@ -26,7 +26,7 @@ learning the bass guitar, playing with my dog (Bert), and enjoying a relaxing me
 
 ## Research Interests
 
-- **Sequential Decision-Making and Planning**
+- **Decision-Sciences and Planning**
 - **Reinforcement Learning**
 - **Statistical & Causal Inference**
 - **Artificial Intelligence**
@@ -69,7 +69,7 @@ learning the bass guitar, playing with my dog (Bert), and enjoying a relaxing me
 - [Tutoring](https://www.wyzant.com/Tutors/dktutorsforfun)
 
 ## Bert
-<img src="./assets/img/bert.jpg" alt="bert" width="200">
+<img src="./assets/img/bert.jpg" alt="bert" width="150">
 
 <!--
 {% include_relative _includes/services.md %}
