@@ -1,4 +1,4 @@
-<h2 id="projects" style="margin: 2px 0px -15px;">Projects, Paperss, & Videos</h2>
+<h2 id="projects" style="margin: 2px 0px -15px;">Projects, Papers, & Videos</h2>
 
 <div class="publications">
 <ol class="bibliography">
