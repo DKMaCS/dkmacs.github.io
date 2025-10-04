@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dennis Kim — Personal Site</title>
+  <meta name="description" content="Dennis Kim — PhD student, researcher, and food enthusiast. Projects, writing, and ways to get in touch." />
+  <meta property="og:title" content="Dennis Kim — Personal Site" />
+  <meta property="og:description" content="PhD student, researcher, and food enthusiast. Projects, writing, and ways to get in touch." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://<your-username>.github.io" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%2300a3ff'/%3E%3Ctext x='50' y='60' text-anchor='middle' font-size='54' font-family='Arial' fill='white'%3ED%3C/text%3E%3C/svg%3E" />
+
+  <!-- Prevent scroll restoration & anchor jumps (run early) -->
+  <script>
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    window.scrollTo(0, 0);
+  </script>
+
+  <style>
+    /* -------------------- Theme tokens -------------------- */
+    :root{
+      --bg:#0b0c10; --panel:#12131a; --text:#e6e6e6; --muted:#9aa1ad;
+      --accent:#38bdf8; --accent-2:#a78bfa; --ring: rgba(56,189,248,.45);
+      --card:#0f1117; --shadow: 0 20px 40px rgba(0,0,0,.25);
+      --measure:72ch;
+    }
+    .light{
+      --bg:#ffffff; --panel:#f5f7fb; --text:#0f172a; --muted:#4b5563;
+      --card:#ffffff; --shadow: 0 10px 30px rgba(2,6,23,.08);
+    }
+
+    /* -------------------- Base & resets -------------------- */
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+    }
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    button,input,select,textarea{color:inherit;font:inherit}
+    button{background:none;border:none;padding:0;cursor:pointer}
+
+    /* -------------------- Layout helpers -------------------- */
+    .container{max-width:1100px;margin:0 auto;padding:0 20px}
+    header{
+      position:sticky;top:0;z-index:10;
+      background:rgba(18,19,26,.8);
+      backdrop-filter:saturate(1.2) blur(8px);
+      border-bottom:1px solid rgba(148,163,184,.15)
+    }
+    .light header{background:rgba(255,255,255,.75)}
+    nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+    .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-2))}
+    .navlinks{display:flex;gap:14px;flex-wrap:wrap}
+    .navlinks a{padding:8px 12px;border-radius:999px}
+    .navlinks a:hover{background:rgba(148,163,184,.12)}
+
+    /* -------------------- Buttons & Pills -------------------- */
+    .btn{
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid rgba(148,163,184,.25);
+      padding:10px 14px;border-radius:12px;
+      background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0));
+      box-shadow:var(--shadow);
+      transition:transform .08s ease;
+      color:var(--text);text-decoration:none
+    }
+    .btn:hover{transform:translateY(-1px);text-decoration:none}
+    a.btn, a.btn:visited{color:var(--text);text-decoration:none}
+    .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#0b0c10;border-color:transparent}
+
+    .pill{
+      padding:8px 12px;border:1px solid rgba(148,163,184,.25);
+      border-radius:999px;background:transparent;color:var(--text)
+    }
+    .pill:hover{background:rgba(148,163,184,.12)}
+    .pill.active{
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      color:#0b0c10;border-color:transparent
+    }
+
+    /* -------------------- Sections -------------------- */
+    .hero{display:grid;grid-template-columns:1.2fr .8fr;gap:28px;align-items:center;padding:56px 0}
+    .hero h1{font-size:clamp(32px,6vw,56px);line-height:1.1;margin:0}
+    .hero p{color:var(--muted);margin-top:10px}
+    .hero .card{background:var(--card);border:1px solid rgba(148,163,184,.15);border-radius:18px;padding:18px}
+
+    .section{padding:44px 0}
+    .section h2{font-size:28px;margin:0 0 16px}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
+
+    .card{background:var(--card);border:1px solid rgba(148,163,184,.15);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+    .tag{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.25);color:var(--muted)}
+
+    .projects .toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+    .projects .toolbar input{
+      flex:1 1 220px;padding:10px 12px;border-radius:10px;
+      border:1px solid rgba(148,163,184,.3);
+      background:transparent;color:inherit;
+      outline:2px solid transparent;outline-offset:2px
+    }
+    .projects .toolbar input:focus{outline:2px solid var(--ring)}
+
+    .project{grid-column:span 6;display:flex;flex-direction:column;gap:10px}
+    @media (max-width:900px){.hero{grid-template-columns:1fr}.project{grid-column:span 12}}
+
+    .project h3{margin:0}
+    .project .meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+    .project .actions{display:flex;gap:10px;margin-top:auto}
+
+    .list li{margin:6px 0}
+
+    footer{padding:28px 0;color:var(--muted)}
+
+    /* -------------------- Animations & Modals -------------------- */
+    .reveal{opacity:0;transform:translateY(10px);transition:opacity .5s ease, transform .5s ease}
+    .reveal.visible{opacity:1;transform:none}
+
+    dialog{border:none;border-radius:16px;background:var(--card);color:inherit;box-shadow:var(--shadow);width:min(720px,92vw)}
+    dialog::backdrop{background:rgba(0,0,0,.45)}
+
+    code.inline{padding:.2em .4em;border-radius:6px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.2)}
+
+    /* -------------------- Avatar -------------------- */
+    .avatar-wrap{display:flex;align-items:center;justify-content:center}
+    .avatar{
+      width:min(280px, 100%); aspect-ratio:1/1; border-radius:50%;
+      object-fit:cover; display:block;
+      border:3px solid rgba(148,163,184,.25); box-shadow:var(--shadow)
+    }
+
+    /* -------------------- Global justification (paragraphs + lists) -------------------- */
+    p, .list li{
+      text-align: justify; text-justify: inter-word;
+      hyphens: manual; overflow-wrap: break-word;
+      max-width: var(--measure);
+    }
+    /* Keep UI chrome left-aligned */
+    h1,h2,h3,.btn,.navlinks a,.pill,.tag,.project .meta,.actions,footer{ text-align:left }
+    @media (max-width:420px){ p, .list li{ text-align:start; hyphens:manual } }
+
+    /* About should fill its card width */
+    #about .card p, #about .card .list li{ max-width: none; }
+
+    /* Courses section */
+    .courses .toolbar{
+      display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;
+    }
+    .courses .toolbar input{
+      flex:1 1 240px; padding:10px 12px; border-radius:10px;
+      border:1px solid rgba(148,163,184,.3); background:transparent; color:inherit;
+      outline:2px solid transparent; outline-offset:2px;
+    }
+    .courses .toolbar input:focus{ outline:2px solid var(--ring); }
+
+    .course-grid{
+      display:grid; grid-template-columns:repeat(12,1fr); gap:14px;
+    }
+    .course{ grid-column:span 6; }
+    @media (max-width:900px){ .course{ grid-column:span 12; } }
+
+    .course .top{
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+    }
+    .badges{ display:flex; gap:8px; flex-wrap:wrap; }
+    .badge{
+      font-size:12px; padding:4px 8px; border-radius:999px;
+      border:1px solid rgba(148,163,184,.25); color:var(--muted);
+    }
+
+    /* Make course descriptions start at the same height */
+    .courses .course{
+      display:grid;
+      grid-template-rows: calc(2 * 1.25em) auto; /* 2 lines for the title */
+    }
+    .courses .course h3{
+      margin:0;
+      line-height:1.25;
+    }
+    .courses .course .top{
+      display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+    }
+
+    /* Align Teaching card paragraphs across columns */
+    #teaching .grid > .card{
+      display:flex; flex-direction:column;
+    }
+    #teaching .grid > .card h3{
+      margin:0 0 8px;
+      line-height:1.25;
+      min-height: calc(1.25em * 2 + 8px);  /* reserve two lines + spacing */
+    }
+    /* Optional 2-line clamp without crop: add the -webkit-line-clamp lines here too */
+
+
+    /* On mobile (stacked), don’t force the title height */
+    @media (max-width: 900px){
+      #teaching .grid > .card{ grid-template-rows: auto auto; }
+      #teaching .grid > .card h3{ -webkit-line-clamp: unset; }
+    }
+
+
+
+  </style>
+
+  <!-- SEO: JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"Person",
+    "name":"Dennis Kim",
+    "url":"https://<your-username>.github.io",
+    "sameAs":["https://github.com/<your-username>","https://www.linkedin.com/in/<your-handle>/"],
+    "jobTitle":"PhD Student, Computer Science",
+    "affiliation":{"@type":"CollegeOrUniversity","name":"Colorado State University"}
+  }
+  </script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <div class="brand"><span class="dot"></span> <span>Dennis Kim</span></div>
+        <div class="navlinks" role="navigation" aria-label="Primary">
+          <a href="#about">About</a>
+          <a href="#projects">Projects</a>
+          <a href="#courses">Courses</a>
+          <a href="#teaching">Teaching</a>
+          <a href="#contact">Contact</a>
+          <button id="themeBtn" class="btn" aria-pressed="false" title="Toggle color theme">Toggle theme</button>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero container">
+      <div>
+        <h1>Hi, I’m Dennis - I study AI, ML, decision sciences, and automation.</h1>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+          <a class="btn primary" href="#projects">See projects</a>
+          <a class="btn" href="#contact">Download CV</a>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+          <span class="tag">Open to internships</span>
+          <span class="tag">Research collabs</span>
+          <span class="tag">Talks & demos</span>
+        </div>
+      </div>
+      <div>
+        <div class="avatar-wrap" style="margin-bottom:16px">
+          <img class="avatar" src="./me.jpg" srcset="./me.jpg 1x, ./me@2x.jpg 2x" alt="Portrait of Dennis Kim" loading="lazy"
+               onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,\
+               <svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 200 200\'>\
+                 <defs><linearGradient id=\'g\' x1=\'0\' y1=\'0\' x2=\'1\' y2=\'1\'>\
+                   <stop offset=\'0\' stop-color=\'%2338bdf8\'/><stop offset=\'1\' stop-color=\'%23a78bfa\'/>\
+                 </linearGradient></defs>\
+                 <rect width=\'100%\' height=\'100%\' fill=\'url(#g)\'/>\
+                 <text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'white\' font-family=\'Arial\' font-size=\'28\'>Your photo</text>\
+               </svg>'"/>
+        </div>
+        <div class="card">
+          <strong style="display:block;margin-bottom:6px">Now</strong>
+          <ul class="list" style="padding-left:18px;margin:0">
+            <li>Quantifying user trust in AI/human collaborative tools.</li>
+            <li>Researching strategies to better understand & predict regime/environmental shifts.</li>
+            <li>Personal projects regarding factor construction and validation, RL trading, causal inference.</li>
+            <li>Began learning piano in my limited free time.</li>
+            <li>Experimenting with slow cooker and neapolitan style pizza recipes.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" class="section container reveal">
+      <h2>About</h2>
+      <div class="card">
+        <p>I’m a Ph.D. student exploring techniques that make us faster, more resilient, and better informed. I like turning math and data into systems clients and stakeholders can and want to use. I work at the intersection of <strong>decision sciences</strong>, <strong>reinforcement learning</strong>, and <strong>human-aware AI</strong>.</p>
+        <p>I’m currently seeking AI/ML or data-science internships and research collaborations. </p>
+
+        <ul class="list" style="padding-left:18px">
+          <li><strong>Focus:</strong> trust in AI-assisted advisors, topology-aware signals for change detection, and data-driven decision support.</li>
+          <li><strong>Strengths:</strong> fast prototyping, rigorous validations, and actionable insights.</li>
+          <li><strong>Currently learning:</strong> causal inference for applied ML, RL for execution strategies, and real-time pipelines.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="timeline" class="section container reveal">
+      <h2>Timeline</h2>
+      <div class="card">
+        <ul class="list" style="padding-left:18px">
+          <li><strong>Jan 2025</strong> - Began trust-in-AI research (ARPA-H funding).</li>
+          <li><strong>Aug 2024</strong> - Began Ph.D. in Computer Science.</li>
+          <li><strong>May 2023</strong> - Completed M.S. in Mathematical Sciences.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="courses" class="section container reveal courses">
+      <h2>Courses</h2>
+
+      <div class="card">
+
+        <div id="courseGrid" class="course-grid">
+          <!-- Example courses; add/remove as you like -->
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Statistical Inference & Regression (including penalization)</h3>
+              <div class="badges">
+                <span class="badge">Stats</span>
+              </div>
+            </div>
+            <p>Topics include multiple regression and correlation methods, model building and validation processes, analysis of variance, logistic regression and regularized regression techniques.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Foundations of Fine-Grained Parallelism</h3>
+              <div class="badges">
+                <span class="badge">CS</span>
+              </div>
+            </div>
+            <p>Explorations into program optimizations for emerging massively parallel architectures while building foundations in the polyhedral model for future portability and research.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Embedded Systems and Machine Learning</h3>
+              <div class="badges">
+                <span class="badge">CS</span>
+              </div>
+            </div>
+            <p>Machine learning for embedded and edge systems, focusing on hardware/software codesign, model optimization, accelerators, applications, and ethical considerations.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Neural Networks</h3>
+              <div class="badges">
+                <span class="badge">CS</span>
+              </div>
+            </div>
+            <p>Introduction to neural networks and machine learning methods, covering decision trees, Bayesian and genetic algorithms, reinforcement learning, and hands-on system design.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Big Data Mining</h3>
+              <div class="badges">
+                <span class="badge">CS</span>
+              </div>
+            </div>
+            <p>Introduction to distributed file systems and map-reduce, with a focus on performance tuning, large-scale data mining algorithms, and applications in clustering, classification, and machine learning.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Linear Algebra</h3>
+              <div class="badges">
+                <span class="badge">Math</span>
+              </div>
+            </div>
+            <p>A balanced introduction to linear algebra as both a problem-solving tool and an abstract mathematical structure, with applications, computing, and advanced topics like spectral theory and matrix decompositions.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Real Analysis</h3>
+              <div class="badges">
+                <span class="badge">Math</span>
+              </div>
+            </div>
+            <p>Introduction to real analysis, focusing on convergence, continuity, differentiation, integration, series of functions, and the development of proof-based reasoning.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Time Series Analysis & Stochastic Modeling</h3>
+              <div class="badges">
+                <span class="badge">Stats</span>
+              </div>
+            </div>
+            <p>Introduction to time series analysis and forecasting, covering ARMA/Box-Jenkins models, seasonality, volatility modeling, and financial risk management applications.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Quantitative Trading & Algorithmic Strategies</h3>
+              <div class="badges">
+                <span class="badge">Math</span>
+              </div>
+            </div>
+            <p>Development of quantitative trading frameworks, covering market mechanics, trading strategies, high-frequency data modeling, portfolio optimization, execution, and performance evaluation.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Advanced Econometrics</h3>
+              <div class="badges">
+                <span class="badge">Econ</span>
+              </div>
+            </div>
+            <p>Introduction to identification and methods to address endogeneity, with emphasis on commonly applied techniques in empirical research.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Quantum Computing</h3>
+              <div class="badges">
+                <span class="badge">CS</span>
+              </div>
+            </div>
+            <p>Graduate course on quantum computing algorithms, focusing on designing and executing programs on simulators and real quantum hardware, with emphasis on contrasts to classical algorithms.</p>
+          </article>
+
+          <article class="course">
+            <div class="top">
+              <h3 style="margin:0">Numerical Optimizations</h3>
+              <div class="badges">
+                <span class="badge">Math</span>
+              </div>
+            </div>
+            <p>Graduate course in optimization methods, covering unconstrained and constrained optimization theory and algorithms (e.g. quasi-Newton, genetic algorithms) with applications in control, systems, and decision-making.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="projects" class="section container projects reveal">
+      <h2>Projects</h2>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search projects (e.g., 'tda', 'react', 'firebase')" aria-label="Search projects" />
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="pill active" data-filter="all" type="button" aria-pressed="true">All</button>
+          <button class="pill" data-filter="ai" type="button" aria-pressed="false">AI/ML</button>
+          <button class="pill" data-filter="systems" type="button" aria-pressed="false">Systems</button>
+          <button class="pill" data-filter="web" type="button" aria-pressed="false">Web</button>
+        </div>
+      </div>
+
+      <div class="grid" id="projectGrid">
+
+
+        <article class="card project" data-tags="ai web firebase" data-title="HELP! Explainable-AI framework">
+          <div class="meta"><span class="tag">Web</span> <span class="tag">AI/ML</span></div>
+          <h3>HELP! Explainable-AI framework</h3>
+          <p>Browser-based experiment (Firebase + Qualtrics + JS) measuring how AI assistance affects perceived competence, sincerity, and selfishness.</p>
+          <div class="actions">
+            <button class="btn" data-modal="errands" type="button">Details</button>
+            <a class="btn" href="#">Demo</a>
+          </div>
+        </article>
+
+        <article class="card project" data-tags="ai systems" data-title="Neural Networks for Behavioral Training">
+          <div class="meta"><span class="tag">AI/ML</span> <span class="tag">Embedded Systems</span></div>
+          <h3>Neural Networks for Behavioral Training</h3>
+          <p>Transfer-learning pipeline for canine behavior recognition on constrained hardware; explored quantization and compression.</p>
+          <div class="actions">
+            <button class="btn" data-modal="npd" type="button">Details</button>
+            <a class="btn" href="#">PDF</a>
+          </div>
+        </article>
+
+        <article class="card project" data-tags="web" data-title="This Website">
+          <div class="meta"><span class="tag">Web</span></div>
+          <h3>This Website</h3>
+          <p>Vanilla HTML/CSS/JS, no build step, GitHub Pages-ready. Interactive filters, dark mode, and smooth animations.</p>
+          <div class="actions">
+            <button class="btn" data-modal="site" type="button">Details</button>
+            <a class="btn" href="#projects">Top</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="teaching" class="section container reveal">
+      <h2>Teaching & Tutoring</h2>
+      <div class="grid">
+        <article class="card" style="grid-column:span 6">
+          <h3>CS 250: Foundations of Computer Systems (TA - Fall 2024)</h3>
+          <p>Help students build intuition for systems, networking, and memory hierarchies; emphasize clarity, curiosity, and confidence.</p>
+        </article>
+        <article class="card" style="grid-column:span 6">
+          <h3>Tutoring</h3>
+          <p>Guiding students in fundamental CS topics as well as statistics, math, and data science.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="skills" class="section container reveal">
+      <h2>Skills Snapshot</h2>
+      <div class="card">
+        <ul class="list" style="padding-left:18px">
+          <li><strong>Languages:</strong> Python, Java, C, R, SQL</li>
+          <li><strong>Libraries:</strong> NumPy, Pandas, SciPy, scikit-learn, Keras, Statsmodels, CVXPY</li>
+          <li><strong>Tools:</strong> AWS, GitHub Actions, PyCharm, IntelliJ, RStudio</li>
+          <li><strong>Paradigms:</strong> OOP, SOLID</li>
+          <li><strong>Currently learning:</strong> causal inference, RL for execution strategies, real-time change detection.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="contact" class="section container reveal">
+      <h2>Contact</h2>
+      <div class="card">
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn primary" href="mailto:denkim1008@gmail.com">Email me</a>
+          <button class="btn" id="copyEmail" data-email="denkim1008@gmail.com" type="button">Copy email</button>
+          <a class="btn" href="resume.pdf" download>Download resume</a>
+          <a class="btn" href="https://github.com/DKMaCS" target="_blank" rel="noopener">GitHub</a>
+          <a class="btn" href="https://www.linkedin.com/in/denniskim1984/" target="_blank" rel="noopener">LinkedIn</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <span>© <span id="year"></span> Dennis Kim</span>
+        <span style="font-size:13px">Built with vanilla HTML/CSS/JS. <span aria-hidden>✨</span></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- -------------------- Modal dialogs -------------------- -->
+  <dialog id="modal-npd">
+    <form method="dialog" style="margin:0">
+      <div style="padding:20px">
+        <h3 style="margin-top:0">Neural Persistence Dynamics</h3>
+        <p>Jointly learns latent dynamics consistent with persistent homology signals. Useful when behavior evolves and you need topology-aware summaries.</p>
+        <p><strong>Stack:</strong> Python, PD features, latent ODEs, evaluation with VE/SMAPE.</p>
+        <menu style="display:flex;justify-content:flex-end;gap:8px;margin:0;margin-top:14px">
+          <button class="btn">Close</button>
+        </menu>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="modal-errands">
+    <form method="dialog" style="margin:0">
+      <div style="padding:20px">
+        <h3 style="margin-top:0">HELP! Explainable-AI framework</h3>
+        <p>Grid game with AI assist cues, Qualtrics animation, and Firebase logging. Measures trust shifts after success/failure events.</p>
+        <p><strong>Stack:</strong> JS, Firebase, Qualtrics, GitHub Actions for deploys.</p>
+        <menu style="display:flex;justify-content:flex-end;gap:8px;margin:0;margin-top:14px">
+          <button class="btn">Close</button>
+        </menu>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="modal-phcd">
+    <form method="dialog" style="margin:0">
+      <div style="padding:20px">
+        <h3 style="margin-top:0">PH-Change Detector</h3>
+        <p>Streams PH features and raises alarms during tolerance windows to flag structural shifts in signals.</p>
+        <p><strong>Stack:</strong> Python, scikit-tda, numpy, simple online rules.</p>
+        <menu style="display:flex;justify-content:flex-end;gap:8px;margin:0;margin-top:14px">
+          <button class="btn">Close</button>
+        </menu>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="modal-site">
+    <form method="dialog" style="margin:0">
+      <div style="padding:20px">
+        <h3 style="margin-top:0">This Website</h3>
+        <p>All-in-one file so it’s easy to host on GitHub Pages. No bundlers, no frameworks—just clean semantics, responsive layout, dark mode, and micro-interactions.</p>
+        <menu style="display:flex;justify-content:flex-end;gap:8px;margin:0;margin-top:14px">
+          <button class="btn">Close</button>
+        </menu>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    // --- Theme toggle -------------------------------------------------------
+    const prefersLight = window.matchMedia('(prefers-color-scheme: light)');
+    const THEME_KEY = 'site.theme';
+    const themeBtn = document.getElementById('themeBtn');
+
+    function applyTheme(theme){
+      if(theme === 'light'){ document.body.classList.add('light'); }
+      else { document.body.classList.remove('light'); }
+      localStorage.setItem(THEME_KEY, theme);
+      themeBtn.setAttribute('aria-pressed', theme === 'light');
+    }
+    const saved = localStorage.getItem(THEME_KEY);
+    const initial = saved || (prefersLight.matches ? 'light' : 'dark');
+    applyTheme(initial);
+    themeBtn.addEventListener('click',()=> applyTheme(document.body.classList.contains('light') ? 'dark' : 'light'));
+
+    // --- Smooth reveal on scroll -------------------------------------------
+    const io = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target);} });
+    },{threshold:.12});
+    document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+    // --- Projects: filter + search -----------------------------------------
+    const pills = [...document.querySelectorAll('.pill')];
+    const cards = [...document.querySelectorAll('.project')];
+    const search = document.getElementById('search');
+    let currentFilter = 'all';
+    function update(){
+      const q = (search.value||'').toLowerCase();
+      cards.forEach(c=>{
+        const tags = c.dataset.tags;
+        const title = c.dataset.title.toLowerCase();
+        const matchesTag = currentFilter==='all' || tags.includes(currentFilter);
+        const matchesText = !q || title.includes(q) || (c.textContent||'').toLowerCase().includes(q);
+        c.style.display = (matchesTag && matchesText) ? '' : 'none';
+      });
+    }
+    pills.forEach(p=>p.addEventListener('click',()=>{
+      pills.forEach(x=>{x.classList.remove('active'); x.setAttribute('aria-pressed','false');});
+      p.classList.add('active');
+      p.setAttribute('aria-pressed','true');
+      currentFilter = p.dataset.filter; update();
+    }));
+    search.addEventListener('input', update);
+
+    // --- Copy email ---------------------------------------------------------
+    const copyBtn = document.getElementById('copyEmail');
+    copyBtn?.addEventListener('click', async ()=>{
+      const email = copyBtn.dataset.email;
+      try{
+        await navigator.clipboard.writeText(email);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(()=>copyBtn.textContent='Copy email', 1200);
+      }catch{
+        alert(email);
+      }
+    });
+
+    // --- Year ---------------------------------------------------------------
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // --- Smooth-scroll nav WITHOUT changing the URL hash --------------------
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const id = a.getAttribute('href').slice(1);
+        const el = document.getElementById(id);
+        if (!el) return;
+        e.preventDefault();
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        history.replaceState(null, '', location.pathname + location.search);
+      });
+    });
+
+    // --- Keyboard: esc closes any open dialog ------------------------------
+    document.addEventListener('keydown', (e)=>{
+      if(e.key==='Escape'){
+        document.querySelectorAll('dialog[open]').forEach(d=>d.close());
+      }
+    });
+  </script>
+</body>
+</html>
