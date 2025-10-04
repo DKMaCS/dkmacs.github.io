@@ -4,32 +4,44 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Mean–Variance Optimizer (Client-Side)</title>
+
   <!-- Minimal styling -->
-  <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <style>
+    /* --- Global sane defaults --- */
+    *, *::before, *::after { box-sizing: border-box; }
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color-scheme: light dark; }
     body { margin: 20px; }
+    img, canvas, textarea { max-width: 100%; }
     h1 { margin: 0 0 8px; font-size: 1.5rem; }
-    .card { border: 1px solid #ccc; border-radius: 12px; padding: 16px; margin: 10px 0; }
-    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+
+    /* --- Layout cards/columns --- */
+    .card { border: 1px solid #ccc; border-radius: 12px; padding: 16px; margin: 10px 0; overflow: hidden; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
     .col { flex: 1 1 340px; min-width: 280px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid2 > * { min-width: 0; } /* allow children to shrink inside the grid */
+    @media (max-width:760px){ .grid2{ grid-template-columns: 1fr; } }
+
+    /* --- Typography & helpers --- */
     label { font-weight: 600; display:block; margin: 8px 0 4px; }
-    input, select, button, textarea { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #bbb; }
-    button { cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { padding: 6px 8px; border-bottom: 1px solid #eee; text-align: right; }
-    th:first-child, td:first-child { text-align: left; }
     .muted { opacity: 0.8; font-size: 0.92rem; }
     .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eee; margin-left:6px; font-size:0.8rem; }
     .inline { display:inline-flex; gap:8px; align-items:center; }
     .warn { color:#a33; font-weight:600; }
     .success { color:#2a7; font-weight:600; }
-    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
     .right { text-align:right; }
     .footer { margin-top: 16px; font-size: 0.9rem; }
     .chips { display:flex; gap:8px; flex-wrap:wrap; }
     .chip { border:1px solid #ddd; border-radius:999px; padding:4px 10px; font-size:.85rem; }
-    @media (max-width:760px){ .grid2{ grid-template-columns: 1fr; } }
+
+    /* --- Form controls (fix overflow) --- */
+    input, select, textarea { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #bbb; }
+    button { padding: 8px; border-radius: 8px; border: 1px solid #bbb; cursor: pointer; }
+    /* Button row inside a card: share space, don't overflow */
+    .card .row button { width: auto; flex: 1 1 0; min-width: 140px; }
+
+    /* Textarea looks nicer for code-ish snippets */
+    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow: auto; }
   </style>
 
   <!-- Libraries: math.js (linear algebra), PapaParse (CSV), Chart.js (plot) -->
@@ -38,7 +50,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <h1>Mean–Variance Optimizer</h1>
+  <h1>Mean–Variance Optimizer <span class="pill">client-side & free</span></h1>
   <p class="muted">Upload a CSV of prices, pick settings, and get the efficient frontier + optimal weights for your chosen risk-aversion (γ). Nothing leaves your browser.</p>
 
   <div class="row">
@@ -53,6 +65,7 @@ Date,SPY,IEF,GLD
 2024-01-03,469.63,95.17,191.41
 2024-01-04,472.28,95.24,192.19
         </textarea>
+
         <div class="grid2">
           <div>
             <label>Return Frequency</label>
@@ -67,6 +80,7 @@ Date,SPY,IEF,GLD
             <input id="rf" type="number" step="0.0001" value="0"/>
           </div>
         </div>
+
         <div class="grid2" style="margin-top:8px;">
           <div>
             <label>Risk-Aversion γ (higher = more risk-averse)</label>
@@ -77,10 +91,12 @@ Date,SPY,IEF,GLD
             <input id="nFrontier" type="number" step="10" value="60"/>
           </div>
         </div>
+
         <div class="chips" style="margin-top:10px;">
           <span class="chip">Shorting allowed (exact closed-form)</span>
           <span class="chip">Constraint: 1ᵀw = 1</span>
         </div>
+
         <div class="row" style="margin-top:10px;">
           <button id="btnCompute">Compute Frontier & Weights</button>
           <button id="btnDownload" disabled>Download Weights CSV</button>
@@ -97,6 +113,7 @@ Date,SPY,IEF,GLD
           <span id="pfStats" class="muted"></span>
         </div>
       </div>
+
       <div class="card">
         <label>Optimal Weights (for chosen γ)</label>
         <div style="overflow:auto; max-height:260px;">
@@ -113,9 +130,9 @@ Date,SPY,IEF,GLD
   <div class="card">
     <strong>Notes & Tips</strong>
     <ul>
-      <li><b>Data:</b> Use adjusted close prices. The app computes simple or log returns (log by default below).</li>
+      <li><b>Data:</b> Use adjusted close prices. The app computes log returns.</li>
       <li><b>Annualization:</b> Means & covariances scale by your selected frequency (252/52/12).</li>
-      <li><b>Long-only?</b> This version is exact for <em>shorting allowed</em>. For strictly non-negative weights you’d need a QP solver; easy next step is adding a projected-gradient routine, but it’s slower and not closed-form.</li>
+      <li><b>Long-only?</b> This version is exact for <em>shorting allowed</em>. For strictly non-negative weights you’ll need a QP step.</li>
       <li><b>Reproducibility:</b> You can download weights as CSV. The chart shows σ (x) vs μ (y).</li>
     </ul>
   </div>
@@ -136,11 +153,8 @@ function parseCSVToMatrix(csv) {
   const headers = parsed.meta.fields;
   if (!headers || headers.length < 2) throw new Error('Need Date + at least one asset column');
 
-  const dateCol = headers[0];
   const tickers = headers.slice(1);
-  // Build price matrix (T x N)
   const prices = rows.map(r => tickers.map(k => Number(r[k])));
-  // Validate numbers
   for (let i=0;i<prices.length;i++){
     for (let j=0;j<prices[0].length;j++){
       if (!isFinite(prices[i][j])) throw new Error(`Bad value at row ${i+2}, col ${tickers[j]}`);
@@ -164,34 +178,26 @@ function toReturns(prices, useLog=true) {
   return R; // (T-1) x N
 }
 
-function mean(vec) {
-  return vec.reduce((a,b)=>a+b,0)/vec.length;
-}
-
-function column(matrix, j) {
-  return matrix.map(row => row[j]);
-}
+function mean(vec) { return vec.reduce((a,b)=>a+b,0)/vec.length; }
+function column(matrix, j) { return matrix.map(row => row[j]); }
 
 function covarianceMatrix(R) {
-  const T = R.length;
-  const N = R[0].length;
+  const T = R.length, N = R[0].length;
   const means = Array.from({length:N}, (_,j)=> mean(column(R,j)));
   const S = math.zeros(N, N)._data;
   for (let i=0;i<N;i++){
     for (let j=0;j<N;j++){
       let s=0;
-      for (let t=0;t<T;t++){
-        s += (R[t][i]-means[i])*(R[t][j]-means[j]);
-      }
+      for (let t=0;t<T;t++) s += (R[t][i]-means[i])*(R[t][j]-means[j]);
       S[i][j] = s/(T-1);
     }
   }
   return { cov: S, mean: means };
 }
 
-function scaleAnnual(μ, Σ, freq) {
-  const muA = μ.map(m => m * freq);
-  const sigA = math.multiply(Σ, freq); // covariance scales linearly with periods
+function scaleAnnual(mu, Sigma, freq) {
+  const muA = mu.map(m => m * freq);
+  const sigA = math.multiply(Sigma, freq); // covariance scales linearly with periods
   return { muA, sigA };
 }
 
@@ -211,7 +217,6 @@ function optimalWeightsGivenGamma(mu, Sigma, gamma) {
   const term1 = math.multiply(1/gamma, invS_mu);
   const term2 = math.multiply((gamma - B)/(gamma * A), invS_1);
   const w = math.add(term1, term2);
-  // numeric clean-up small eps
   return w.map(x => Math.abs(x) < 1e-12 ? 0 : x);
 }
 
@@ -231,7 +236,6 @@ function efficientFrontier(mu, Sigma, nPoints=60, margin=0.15) {
   const D = A*C - B*B;
   if (D <= 0) throw new Error('Non-PD covariance or collinearity: D ≤ 0');
 
-  // pick a sensible return range: [μ_min, μ_max] expanded by margin
   const muMin = Math.min(...mu);
   const muMax = Math.max(...mu);
   const span  = muMax - muMin || Math.max(Math.abs(muMax), 1e-3);
@@ -276,13 +280,13 @@ $('#btnCompute').addEventListener('click', async () => {
     const { cov, mean: m } = covarianceMatrix(R);
     const { muA, sigA } = scaleAnnual(m, cov, freq);
 
-    // Excess returns vs risk-free if desired for the utility
+    // Excess returns vs risk-free for the utility
     const muExcess = muA.map(u => u - rf);
 
-    // Frontier (using total returns in formula)
+    // Frontier (uses total μ)
     const frontPts = efficientFrontier(muA, sigA, nFrontier);
 
-    // Optimal weights for chosen gamma (utility uses excess μ but constraint uses Σ)
+    // Optimal weights for chosen γ
     const wStar = optimalWeightsGivenGamma(muExcess, sigA, gamma);
 
     // Display weights
@@ -300,7 +304,8 @@ $('#btnCompute').addEventListener('click', async () => {
 
     // Stats of optimal portfolio (with total μ)
     const stats = portfolioStats(wStar, muA, sigA);
-    $('#pfStats').textContent = `Optimal (γ=${gamma}):  E[μ]=${(stats.ret*100).toFixed(2)}%  |  σ=${(stats.vol*100).toFixed(2)}%  |  Sharpe≈${((stats.ret - rf)/Math.max(stats.vol,1e-9)).toFixed(2)}`;
+    $('#pfStats').textContent =
+      `Optimal (γ=${gamma}):  E[μ]=${(stats.ret*100).toFixed(2)}%  |  σ=${(stats.vol*100).toFixed(2)}%  |  Sharpe≈${((stats.ret - rf)/Math.max(stats.vol,1e-9)).toFixed(2)}`;
 
     // Plot
     const data = {
