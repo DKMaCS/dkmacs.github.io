@@ -33,8 +33,9 @@
       textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow: auto; }
 
       /* --- FIX: keep checkbox + text together --- */
-      .toggle { display:inline-flex; align-items:center; gap:8px; margin-top:8px; }
-      .toggle input { margin:0; }
+      .toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; white-space: nowrap; }
+      .toggle input { margin: 0; }
+
     </style>
 
 
@@ -87,10 +88,10 @@ Date,SPY,IEF,GLD
         </div>
 
         <div class="toggle">
-          <input id="longOnly" type="checkbox"/>
-          <label for="longOnly">
+            <label class="toggle">
+              <input id="longOnly" type="checkbox">
               Long-only (no shorting)
-          </label>
+            </label>
         </div>
 
         <div class="chips" style="margin-top:10px;">
