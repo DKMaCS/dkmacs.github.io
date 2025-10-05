@@ -5,24 +5,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Mean–Variance Optimizer</title>
 
-  <!-- Minimal styling -->
   <style>
-    /* --- Global sane defaults --- */
     *, *::before, *::after { box-sizing: border-box; }
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color-scheme: light dark; }
     body { margin: 20px; }
     img, canvas, textarea { max-width: 100%; }
     h1 { margin: 0 0 8px; font-size: 1.5rem; }
-
-    /* --- Layout cards/columns --- */
     .card { border: 1px solid #ccc; border-radius: 12px; padding: 16px; margin: 10px 0; overflow: hidden; }
     .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
     .col { flex: 1 1 340px; min-width: 280px; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .grid2 > * { min-width: 0; }
     @media (max-width:760px){ .grid2{ grid-template-columns: 1fr; } }
-
-    /* --- Typography & helpers --- */
     label { font-weight: 600; display:block; margin: 8px 0 4px; }
     .muted { opacity: 0.8; font-size: 0.92rem; }
     .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eee; margin-left:6px; font-size:0.8rem; }
@@ -33,12 +27,9 @@
     .footer { margin-top: 16px; font-size: 0.9rem; }
     .chips { display:flex; gap:8px; flex-wrap:wrap; }
     .chip { border:1px solid #ddd; border-radius:999px; padding:4px 10px; font-size:.85rem; }
-
-    /* --- Form controls (fix overflow) --- */
     input, select, textarea { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #bbb; }
     button { padding: 8px; border-radius: 8px; border: 1px solid #bbb; cursor: pointer; }
     .card .row button { width: auto; flex: 1 1 0; min-width: 140px; }
-
     textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow: auto; }
   </style>
 
@@ -95,9 +86,12 @@ Date,SPY,IEF,GLD
           <span class="chip">Constraint: 1ᵀw = 1</span>
         </div>
 
-        <div class="row" style="margin-top:10px;">
+        <div class="row" style="margin-top:10px; gap:8px;">
           <button id="btnCompute">Compute Frontier & Weights</button>
-          <button id="btnDownload" disabled>Download Weights CSV</button>
+          <!-- NEW: separate download buttons -->
+          <button id="btnDownloadGamma"  disabled>Download Gamma</button>
+          <button id="btnDownloadTan"    disabled>Download Tangency</button>
+          <button id="btnDownloadMVP"    disabled>Download MVP</button>
         </div>
         <p id="status" class="muted" style="margin-top:8px;"></p>
       </div>
@@ -199,6 +193,13 @@ function scaleAnnual(mu, Sigma, freq) {
   return { muA, sigA };
 }
 
+/* Helpers to handle math.js Matrix/Array */
+function toArray1D(x) {
+  if (Array.isArray(x)) return x.flat();
+  if (x && typeof x.toArray === 'function') return x.toArray().flat();
+  return [x];
+}
+
 /* === MVO Closed-Form (shorting allowed, 1ᵀw=1) === */
 function optimalWeightsGivenGamma(mu, Sigma, gamma) {
   const N = mu.length;
@@ -211,10 +212,21 @@ function optimalWeightsGivenGamma(mu, Sigma, gamma) {
   const term1 = math.multiply(1/gamma, invS_mu);
   const term2 = math.multiply((gamma - B)/(gamma * A), invS_1);
   const w = math.add(term1, term2);
-  return w.map(x => Math.abs(x) < 1e-12 ? 0 : x);
+  return toArray1D(w).map(x => Math.abs(x) < 1e-12 ? 0 : x);
 }
 
-/* === Efficient Frontier (equality-constrained) === */
+/* MVP weights: w = Σ^{-1}1 / (1ᵀΣ^{-1}1) */
+function mvpWeights(Sigma) {
+  const N = Sigma.length;
+  const I = math.ones(N)._data;
+  const invS = math.inv(Sigma);
+  const invS1 = math.multiply(invS, I);
+  const A = math.multiply(math.transpose(I), invS1);
+  const w = math.divide(invS1, A);
+  return toArray1D(w);
+}
+
+/* Efficient Frontier (equality-constrained) */
 function efficientFrontier(mu, Sigma, nPoints=60, margin=0.15) {
   const N = mu.length;
   const I = math.ones(N)._data;
@@ -237,21 +249,20 @@ function efficientFrontier(mu, Sigma, nPoints=60, margin=0.15) {
     const beta  = (A*r - B)/D;
     const w = math.multiply(invS, math.add(math.multiply(alpha, I), math.multiply(beta, mu)));
     const var_ = (A*r*r - 2*B*r + C)/D;
-    pts.push({ r, s: Math.sqrt(Math.max(var_, 0)), w });
+    pts.push({ r, s: Math.sqrt(Math.max(var_, 0)), w: toArray1D(w) });
   }
   return pts;
 }
 
-/* === Stats === */
+/* Stats */
 function portfolioStats(w, mu, Sigma) {
-  const ret = math.multiply(math.transpose(w), mu);
-  const var_ = math.multiply(math.transpose(w), math.multiply(Sigma, w));
-  return { ret, vol: Math.sqrt(Math.max(var_, 0)) };
+  const wv = math.matrix(w);
+  const ret = math.multiply(math.transpose(wv), mu);
+  const var_ = math.multiply(math.transpose(wv), math.multiply(Sigma, wv));
+  return { ret: Number(ret), vol: Math.sqrt(Math.max(Number(var_), 0)) };
 }
 
-/* === Tangency (max Sharpe) and CML ===
-   Tangency weights (sum to 1): w_T = Σ^{-1}(μ - r_f 1) / (1ᵀΣ^{-1}(μ - r_f 1))
-*/
+/* Tangency (max Sharpe), sum-to-1 */
 function tangencyPortfolio(mu, Sigma, rf) {
   const N = mu.length;
   const I = math.ones(N)._data;
@@ -260,9 +271,10 @@ function tangencyPortfolio(mu, Sigma, rf) {
   const num  = math.multiply(invS, muEx);                       // Σ^{-1}(μ - r_f 1)
   const den  = math.multiply(math.transpose(I), num);           // 1ᵀΣ^{-1}(μ - r_f 1)
   const wT   = math.divide(num, den);                           // normalize to sum to 1
-  const { ret, vol } = portfolioStats(wT, mu, Sigma);
+  const wTa  = toArray1D(wT);
+  const { ret, vol } = portfolioStats(wTa, mu, Sigma);
   const sharpe = (ret - rf) / Math.max(vol, 1e-12);
-  return { wT, ret, vol, sharpe };
+  return { wT: wTa, ret, vol, sharpe };
 }
 
 function makeCMLPoints(rf, tanVol, tanRet, xMax, n=50) {
@@ -277,7 +289,7 @@ function makeCMLPoints(rf, tanVol, tanRet, xMax, n=50) {
 }
 
 /* === UI wiring === */
-let lastWeights = null;
+let weightsGamma = null, weightsTan = null, weightsMVP = null;
 
 $('#btnCompute').addEventListener('click', async () => {
   try {
@@ -297,7 +309,7 @@ $('#btnCompute').addEventListener('click', async () => {
     const { cov, mean: m } = covarianceMatrix(R);
     const { muA, sigA } = scaleAnnual(m, cov, freq);
 
-    // Frontier (uses total μ)
+    // Frontier
     const frontPts = efficientFrontier(muA, sigA, nFrontier);
 
     // Tangency + CML
@@ -305,27 +317,36 @@ $('#btnCompute').addEventListener('click', async () => {
     const maxSigma = Math.max(tanVol, ...frontPts.map(p => p.s)) * 1.05;
     const cmlPts = makeCMLPoints(rf, tanVol, tanRet, maxSigma, 80);
 
-    // Optimal weights for chosen γ (utility uses μ - r_f but constraint uses Σ)
-    const muExcess = muA.map(u => u - rf);
-    const wStar = optimalWeightsGivenGamma(muExcess, sigA, gamma);
+    // MVP
+    const wM = mvpWeights(sigA);
 
-    // Display weights (for γ)
+    // Gamma (uses μ - r_f inside the γ formula)
+    const muExcess = muA.map(u => u - rf);
+    const wG = optimalWeightsGivenGamma(muExcess, sigA, gamma);
+
+    // Save three labeled arrays for downloads
+    weightsGamma = tickers.map((t,i) => ({ Asset: t, Weight: wG[i] }));
+    weightsTan   = tickers.map((t,i) => ({ Asset: t, Weight: wT[i] }));
+    weightsMVP   = tickers.map((t,i) => ({ Asset: t, Weight: wM[i] }));
+
+    // Display gamma in the table (as before)
     const tbody = $('#weightsTable tbody');
     tbody.innerHTML = '';
-    lastWeights = [];
     for (let i=0;i<tickers.length;i++){
       const tr = document.createElement('tr');
-      const wt = wStar[i];
-      lastWeights.push({ Asset: tickers[i], Weight: wt });
-      tr.innerHTML = `<td>${tickers[i]}</td><td>${(wt*100).toFixed(2)}%</td>`;
+      tr.innerHTML = `<td>${tickers[i]}</td><td>${(wG[i]*100).toFixed(2)}%</td>`;
       tbody.appendChild(tr);
     }
-    $('#btnDownload').disabled = false;
 
-    // Stats
-    const stats = portfolioStats(wStar, muA, sigA);
+    // Enable download buttons
+    $('#btnDownloadGamma').disabled = false;
+    $('#btnDownloadTan').disabled   = false;
+    $('#btnDownloadMVP').disabled   = false;
+
+    // Stats for gamma & tangency
+    const statsG = portfolioStats(wG, muA, sigA);
     $('#pfStats').textContent =
-      `Optimal (γ=${gamma}):  E[μ]=${(stats.ret*100).toFixed(2)}%  |  σ=${(stats.vol*100).toFixed(2)}%  |  Sharpe≈${((stats.ret - rf)/Math.max(stats.vol,1e-9)).toFixed(2)}`;
+      `Optimal (γ=${gamma}):  E[μ]=${(statsG.ret*100).toFixed(2)}%  |  σ=${(statsG.vol*100).toFixed(2)}%  |  Sharpe≈${((statsG.ret - rf)/Math.max(statsG.vol,1e-9)).toFixed(2)}`;
     $('#tanStats').textContent =
       `Tangency:  E[μ]=${(tanRet*100).toFixed(2)}%  |  σ=${(tanVol*100).toFixed(2)}%  |  Sharpe=${tanSharpe.toFixed(2)}  |  rf=${(rf*100).toFixed(2)}%`;
 
@@ -333,29 +354,10 @@ $('#btnCompute').addEventListener('click', async () => {
     const data = {
       labels: frontPts.map(_=> ''),
       datasets: [
-        {
-          label: 'Efficient Frontier',
-          data: frontPts.map(p => ({ x: p.s, y: p.r })),
-          showLine: true,
-          pointRadius: 2
-        },
-        {
-          label: 'CML (through Tangency)',
-          data: cmlPts,
-          showLine: true,
-          pointRadius: 0,
-          borderDash: [6,4]
-        },
-        {
-          label: 'Tangency Portfolio',
-          data: [{ x: tanVol, y: tanRet }],
-          pointRadius: 5
-        },
-        {
-          label: 'Your Portfolio (γ)',
-          data: [{ x: stats.vol, y: stats.ret }],
-          pointRadius: 5
-        }
+        { label: 'Efficient Frontier', data: frontPts.map(p => ({ x: p.s, y: p.r })), showLine: true, pointRadius: 2 },
+        { label: 'CML (through Tangency)', data: cmlPts, showLine: true, pointRadius: 0, borderDash: [6,4] },
+        { label: 'Tangency Portfolio', data: [{ x: tanVol, y: tanRet }], pointRadius: 5 },
+        { label: 'Your Portfolio (γ)', data: [{ x: statsG.vol, y: statsG.ret }], pointRadius: 5 }
       ]
     };
     const ctx = document.getElementById('frontierChart');
@@ -391,14 +393,29 @@ $('#btnCompute').addEventListener('click', async () => {
   }
 });
 
-$('#btnDownload').addEventListener('click', () => {
-  if (!lastWeights) return;
-  const rows = ['Asset,Weight'].concat(lastWeights.map(r => `${r.Asset},${r.Weight}`));
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'weights.csv'; a.click();
+/* CSV download helper */
+function downloadCSV(rows, filename) {
+  const header = 'Asset,Weight';
+  const body   = rows.map(r => `${r.Asset},${r.Weight}`);
+  const blob   = new Blob([[header, ...body].join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url    = URL.createObjectURL(blob);
+  const a      = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
+}
+
+/* Three download buttons */
+document.getElementById('btnDownloadGamma').addEventListener('click', () => {
+  if (!weightsGamma) return;
+  downloadCSV(weightsGamma, 'weights_gamma.csv');
+});
+document.getElementById('btnDownloadTan').addEventListener('click', () => {
+  if (!weightsTan) return;
+  downloadCSV(weightsTan, 'weights_tangency.csv');
+});
+document.getElementById('btnDownloadMVP').addEventListener('click', () => {
+  if (!weightsMVP) return;
+  downloadCSV(weightsMVP, 'weights_mvp.csv');
 });
 </script>
 </body>
