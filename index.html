@@ -687,6 +687,21 @@
         document.querySelectorAll('dialog[open]').forEach(d=>d.close());
       }
     });
+
+    // Open any dialog whose opener has data-modal="XYZ" and dialog id="modal-XYZ"
+    document.querySelectorAll('[data-modal]').forEach(btn => {
+      const id = btn.dataset.modal;
+      const dlg = document.getElementById(`modal-${id}`);
+      if (dlg) btn.addEventListener('click', () => dlg.showModal());
+    });
+
+    // Optional: click outside to close
+    document.querySelectorAll('dialog').forEach(dlg => {
+      dlg.addEventListener('click', (e) => {
+        if (e.target === dlg) dlg.close();
+      });
+    });
+
   </script>
 </body>
 </html>
