@@ -11,7 +11,7 @@
   <meta property="og:url" content="https://<your-username>.github.io" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%2300a3ff'/%3E%3Ctext x='50' y='60' text-anchor='middle' font-size='54' font-family='Arial' fill='white'%3ED%3C/text%3E%3C/svg%3E" />
 
-  <!-- Prevent scroll restoration & anchor jumps (run early) -->
+  <!-- Prevent scroll restoration -->
   <script>
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
@@ -19,7 +19,7 @@
   </script>
 
   <style>
-    /* -------------------- Theme tokens -------------------- */
+    /* Theme details */
     :root{
       --bg:#0b0c10; --panel:#12131a; --text:#e6e6e6; --muted:#9aa1ad;
       --accent:#38bdf8; --accent-2:#a78bfa; --ring: rgba(56,189,248,.45);
@@ -31,7 +31,7 @@
       --card:#ffffff; --shadow: 0 10px 30px rgba(2,6,23,.08);
     }
 
-    /* -------------------- Base & resets -------------------- */
+    /*  Base & resets  */
     *,*::before,*::after{box-sizing:border-box}
     html,body{height:100%}
     body{
@@ -43,7 +43,7 @@
     button,input,select,textarea{color:inherit;font:inherit}
     button{background:none;border:none;padding:0;cursor:pointer}
 
-    /* -------------------- Layout helpers -------------------- */
+    /*  Layout helpers  */
     .container{max-width:1100px;margin:0 auto;padding:0 20px}
     header{
       position:sticky;top:0;z-index:10;
@@ -59,7 +59,7 @@
     .navlinks a{padding:8px 12px;border-radius:999px}
     .navlinks a:hover{background:rgba(148,163,184,.12)}
 
-    /* -------------------- Buttons & Pills -------------------- */
+    /*  Buttons & Pills  */
     .btn{
       display:inline-flex;align-items:center;gap:8px;
       border:1px solid rgba(148,163,184,.25);
@@ -83,7 +83,7 @@
       color:#0b0c10;border-color:transparent
     }
 
-    /* -------------------- Sections -------------------- */
+    /*  Sections  */
     .hero{display:grid;grid-template-columns:1.2fr .8fr;gap:28px;align-items:center;padding:56px 0}
     .hero h1{font-size:clamp(32px,6vw,56px);line-height:1.1;margin:0}
     .hero p{color:var(--muted);margin-top:10px}
@@ -116,7 +116,7 @@
 
     footer{padding:28px 0;color:var(--muted)}
 
-    /* -------------------- Animations & Modals -------------------- */
+    /*  Animations & Modals  */
     .reveal{opacity:0;transform:translateY(10px);transition:opacity .5s ease, transform .5s ease}
     .reveal.visible{opacity:1;transform:none}
 
@@ -125,7 +125,7 @@
 
     code.inline{padding:.2em .4em;border-radius:6px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.2)}
 
-    /* -------------------- Avatar -------------------- */
+    /*  Avatar  */
     .avatar-wrap{display:flex;align-items:center;justify-content:center}
     .avatar{
       width:min(280px, 100%); aspect-ratio:1/1; border-radius:50%;
@@ -133,7 +133,7 @@
       border:3px solid rgba(148,163,184,.25); box-shadow:var(--shadow)
     }
 
-    /* -------------------- Global justification (paragraphs + lists) -------------------- */
+    /*  Global justification (paragraphs + lists)  */
     p, .list li{
       text-align: justify; text-justify: inter-word;
       hyphens: manual; overflow-wrap: break-word;
@@ -544,7 +544,7 @@
     </div>
   </footer>
 
-  <!-- -------------------- Modal dialogs -------------------- -->
+  <!--  Modal dialogs  -->
   <dialog id="modal-bt">
     <form method="dialog" style="margin:0">
       <div style="padding:20px">
@@ -608,7 +608,7 @@
   </dialog>
 
   <script>
-    // --- Theme toggle -------------------------------------------------------
+    //   Theme toggle    
     const prefersLight = window.matchMedia('(prefers-color-scheme: light)');
     const THEME_KEY = 'site.theme';
     const themeBtn = document.getElementById('themeBtn');
@@ -624,13 +624,13 @@
     applyTheme(initial);
     themeBtn.addEventListener('click',()=> applyTheme(document.body.classList.contains('light') ? 'dark' : 'light'));
 
-    // --- Smooth reveal on scroll -------------------------------------------
+    //   Smooth reveal on scroll     
     const io = new IntersectionObserver((entries)=>{
       entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target);} });
     },{threshold:.12});
     document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 
-    // --- Projects: filter + search -----------------------------------------
+    //   Projects: filter + search
     const pills = [...document.querySelectorAll('.pill')];
     const cards = [...document.querySelectorAll('.project')];
     const search = document.getElementById('search');
@@ -653,7 +653,7 @@
     }));
     search.addEventListener('input', update);
 
-    // --- Copy email ---------------------------------------------------------
+    //   Copy email    --
     const copyBtn = document.getElementById('copyEmail');
     copyBtn?.addEventListener('click', async ()=>{
       const email = copyBtn.dataset.email;
@@ -666,10 +666,10 @@
       }
     });
 
-    // --- Year ---------------------------------------------------------------
+    //   Year    --------
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    // --- Smooth-scroll nav WITHOUT changing the URL hash --------------------
+    //   Smooth-scroll nav WITHOUT changing the URL hash
     document.querySelectorAll('a[href^="#"]').forEach(a => {
       a.addEventListener('click', e => {
         const id = a.getAttribute('href').slice(1);
@@ -681,7 +681,7 @@
       });
     });
 
-    // --- Keyboard: esc closes any open dialog ------------------------------
+    //   Keyboard: esc closes any open dialog
     document.addEventListener('keydown', (e)=>{
       if(e.key==='Escape'){
         document.querySelectorAll('dialog[open]').forEach(d=>d.close());
