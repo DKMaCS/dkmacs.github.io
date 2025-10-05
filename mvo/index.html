@@ -66,7 +66,7 @@ Date,SPY,IEF,GLD
           </div>
           <div>
             <label>Risk-Free Rate (annualized, e.g. 0.02 = 2%)</label>
-            <input id="rf" type="number" step="0.0001" value="0"/>
+            <input id="rf" type="number" step="0.0001" value="0.02"/>
           </div>
         </div>
 
@@ -77,7 +77,7 @@ Date,SPY,IEF,GLD
           </div>
           <div>
             <label>Frontier Points</label>
-            <input id="nFrontier" type="number" step="10" value="60"/>
+            <input id="nFrontier" type="number" step="10" value="120"/>
           </div>
         </div>
 
@@ -88,7 +88,6 @@ Date,SPY,IEF,GLD
 
         <div class="row" style="margin-top:10px; gap:8px;">
           <button id="btnCompute">Compute Frontier & Weights</button>
-          <!-- NEW: separate download buttons -->
           <button id="btnDownloadGamma"  disabled>Download Gamma</button>
           <button id="btnDownloadTan"    disabled>Download Tangency</button>
           <button id="btnDownloadMVP"    disabled>Download MVP</button>
@@ -134,6 +133,9 @@ Date,SPY,IEF,GLD
 const $ = sel => document.querySelector(sel);
 const statusEl = $('#status');
 let chart;
+
+/* Optional: cap γ-portfolio gross leverage (sum |w|). Set to a number like 3.0; leave null to disable. */
+const GROSS_LEV_CAP = null; // e.g., 3.0 to limit extreme long/short visuals
 
 /* CSV -> matrix helpers */
 function parseCSVToMatrix(csv) {
@@ -193,11 +195,16 @@ function scaleAnnual(mu, Sigma, freq) {
   return { muA, sigA };
 }
 
-/* Helpers to handle math.js Matrix/Array */
+/* Helpers */
 function toArray1D(x) {
   if (Array.isArray(x)) return x.flat();
   if (x && typeof x.toArray === 'function') return x.toArray().flat();
   return [x];
+}
+function sumAbs(v){ return v.reduce((a,b)=>a+Math.abs(b),0); }
+function scaleToGross(w, cap){
+  const g = sumAbs(w);
+  return g > cap ? w.map(x => x * (cap / g)) : w;
 }
 
 /* === MVO Closed-Form (shorting allowed, 1ᵀw=1) === */
@@ -226,8 +233,12 @@ function mvpWeights(Sigma) {
   return toArray1D(w);
 }
 
-/* Efficient Frontier (equality-constrained) */
-function efficientFrontier(mu, Sigma, nPoints=60, margin=0.15) {
+/* Efficient Frontier with smarter μ-range
+   Ensures the target-return range covers MVP → max(Tangency μ, Gamma μ) with margin,
+   so the frontier “tail” is visible and your γ-point lies on/near the curve.
+*/
+function efficientFrontier(mu, Sigma, nPoints=120, opts={}) {
+  const { includeMu = [], margin = 0.30 } = opts; // includeMu: [mu_gamma, mu_tan] etc.
   const N = mu.length;
   const I = math.ones(N)._data;
   const invS = math.inv(Sigma);
@@ -237,10 +248,18 @@ function efficientFrontier(mu, Sigma, nPoints=60, margin=0.15) {
   const D = A*C - B*B;
   if (D <= 0) throw new Error('Non-PD covariance or collinearity: D ≤ 0');
 
-  const muMin = Math.min(...mu);
-  const muMax = Math.max(...mu);
-  const span  = muMax - muMin || Math.max(Math.abs(muMax), 1e-3);
-  const rLo = muMin - margin*span, rHi = muMax + margin*span;
+  const mu_mvp = B / A;
+  const rawMin = Math.min(...mu);
+  const rawMax = Math.max(...mu);
+
+  let rLo = Math.min(mu_mvp, rawMin);
+  let rHi = Math.max(rawMax, ...includeMu);
+
+  // Expand both ends so the curve isn't visually truncated
+  const spanUp = Math.max(rHi - mu_mvp, 1e-6);
+  const spanDn = Math.max(mu_mvp - rLo, 1e-6);
+  rHi = rHi + margin * spanUp;
+  rLo = rLo - margin * spanDn;
 
   const pts = [];
   for (let k=0;k<nPoints;k++){
@@ -277,7 +296,7 @@ function tangencyPortfolio(mu, Sigma, rf) {
   return { wT: wTa, ret, vol, sharpe };
 }
 
-function makeCMLPoints(rf, tanVol, tanRet, xMax, n=50) {
+function makeCMLPoints(rf, tanVol, tanRet, xMax, n=80) {
   const slope = (tanRet - rf) / Math.max(tanVol, 1e-12);
   const pts = [];
   for (let i=0;i<n;i++){
@@ -301,7 +320,7 @@ $('#btnCompute').addEventListener('click', async () => {
     const freq = Number($('#freq').value);
     const rf = Number($('#rf').value) || 0;
     const gamma = Number($('#gamma').value);
-    const nFrontier = Math.max(10, Number($('#nFrontier').value));
+    const nFrontier = Math.max(20, Number($('#nFrontier').value));
 
     const { tickers, prices } = parseCSVToMatrix(text);
     if (prices.length < 3) throw new Error('Need at least 3 rows of prices.');
@@ -309,27 +328,31 @@ $('#btnCompute').addEventListener('click', async () => {
     const { cov, mean: m } = covarianceMatrix(R);
     const { muA, sigA } = scaleAnnual(m, cov, freq);
 
-    // Frontier
-    const frontPts = efficientFrontier(muA, sigA, nFrontier, 1.0);
+    // === Compute γ-portfolio first (uses μ - r_f) ===
+    const muExcess = muA.map(u => u - rf);
+    let wG = optimalWeightsGivenGamma(muExcess, sigA, gamma);
+    if (GROSS_LEV_CAP) wG = scaleToGross(wG, GROSS_LEV_CAP);
+    const statsG = portfolioStats(wG, muA, sigA);
 
-    // Tangency + CML
+    // === Tangency + CML ===
     const { wT, ret: tanRet, vol: tanVol, sharpe: tanSharpe } = tangencyPortfolio(muA, sigA, rf);
-    const maxSigma = Math.max(tanVol, ...frontPts.map(p => p.s)) * 1.05;
-    const cmlPts = makeCMLPoints(rf, tanVol, tanRet, maxSigma, 80);
 
-    // MVP
+    // === MVP ===
     const wM = mvpWeights(sigA);
 
-    // Gamma (uses μ - r_f inside the γ formula)
-    const muExcess = muA.map(u => u - rf);
-    const wG = optimalWeightsGivenGamma(muExcess, sigA, gamma);
+    // === Frontier (now guaranteed to include γ and Tangency returns) ===
+    const frontPts = efficientFrontier(muA, sigA, nFrontier, { includeMu: [statsG.ret, tanRet], margin: 0.35 });
 
-    // Save three labeled arrays for downloads
+    // === CML range covers frontier & γ point ===
+    const maxSigma = Math.max(tanVol, statsG.vol, ...frontPts.map(p => p.s)) * 1.05;
+    const cmlPts = makeCMLPoints(rf, tanVol, tanRet, maxSigma, 100);
+
+    // Save for downloads
     weightsGamma = tickers.map((t,i) => ({ Asset: t, Weight: wG[i] }));
     weightsTan   = tickers.map((t,i) => ({ Asset: t, Weight: wT[i] }));
     weightsMVP   = tickers.map((t,i) => ({ Asset: t, Weight: wM[i] }));
 
-    // Display gamma in the table (as before)
+    // Table: γ-weights
     const tbody = $('#weightsTable tbody');
     tbody.innerHTML = '';
     for (let i=0;i<tickers.length;i++){
@@ -343,21 +366,20 @@ $('#btnCompute').addEventListener('click', async () => {
     $('#btnDownloadTan').disabled   = false;
     $('#btnDownloadMVP').disabled   = false;
 
-    // Stats for gamma & tangency
-    const statsG = portfolioStats(wG, muA, sigA);
+    // Stats text
     $('#pfStats').textContent =
       `Optimal (γ=${gamma}):  E[μ]=${(statsG.ret*100).toFixed(2)}%  |  σ=${(statsG.vol*100).toFixed(2)}%  |  Sharpe≈${((statsG.ret - rf)/Math.max(statsG.vol,1e-9)).toFixed(2)}`;
     $('#tanStats').textContent =
       `Tangency:  E[μ]=${(tanRet*100).toFixed(2)}%  |  σ=${(tanVol*100).toFixed(2)}%  |  Sharpe=${tanSharpe.toFixed(2)}  |  rf=${(rf*100).toFixed(2)}%`;
 
-    // Plot (frontier + CML + points)
+    // Plot
     const data = {
       labels: frontPts.map(_=> ''),
       datasets: [
         { label: 'Efficient Frontier', data: frontPts.map(p => ({ x: p.s, y: p.r })), showLine: true, pointRadius: 2 },
         { label: 'CML (through Tangency)', data: cmlPts, showLine: true, pointRadius: 0, borderDash: [6,4] },
-        { label: 'Tangency Portfolio', data: [{ x: tanVol, y: tanRet }], pointRadius: 5 },
-        { label: 'Your Portfolio (γ)', data: [{ x: statsG.vol, y: statsG.ret }], pointRadius: 5 }
+        { label: 'Tangency Portfolio', data: [{ x: tanVol, y: tanRet }], pointRadius: 6 },
+        { label: 'Your Portfolio (γ)', data: [{ x: statsG.vol, y: statsG.ret }], pointRadius: 6 }
       ]
     };
     const ctx = document.getElementById('frontierChart');
