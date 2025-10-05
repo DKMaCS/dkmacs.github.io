@@ -1,145 +1,3 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Mean–Variance Optimizer</title>
-
-    <style>
-      *, *::before, *::after { box-sizing: border-box; }
-      :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color-scheme: light dark; }
-      body { margin: 20px; }
-      img, canvas, textarea { max-width: 100%; }
-      h1 { margin: 0 0 8px; font-size: 1.5rem; }
-      .card { border: 1px solid #ccc; border-radius: 12px; padding: 16px; margin: 10px 0; overflow: hidden; }
-      .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-      .col { flex: 1 1 340px; min-width: 280px; }
-      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      .grid2 > * { min-width: 0; }
-      @media (max-width:760px){ .grid2{ grid-template-columns: 1fr; } }
-      label { font-weight: 600; display:block; margin: 8px 0 4px; }
-      .muted { opacity: 0.8; font-size: 0.92rem; }
-      .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eee; margin-left:6px; font-size:0.8rem; }
-      .inline { display:inline-flex; gap:8px; align-items:center; }
-      .warn { color:#a33; font-weight:600; }
-      .success { color:#2a7; font-weight:600; }
-      .right { text-align:right; }
-      .footer { margin-top: 16px; font-size: 0.9rem; }
-      .chips { display:flex; gap:8px; flex-wrap:wrap; }
-      .chip { border:1px solid #ddd; border-radius:999px; padding:4px 10px; font-size:.85rem; }
-      input, select, textarea { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #bbb; }
-      button { padding: 8px; border-radius: 8px; border: 1px solid #bbb; cursor: pointer; }
-      .card .row button { width: auto; flex: 1 1 0; min-width: 140px; }
-      textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow: auto; }
-
-      /* --- FIX: keep checkbox + text together --- */
-      .toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; white-space: nowrap; }
-      .toggle input { margin: 0; }
-
-    </style>
-
-
-  <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/mathjs@11.11.1/lib/browser/math.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-</head>
-<body>
-  <h1>Mean–Variance Optimizer</h1>
-  <p class="muted">Upload a CSV of prices, pick settings, and get the efficient frontier, CML, tangency, and γ-portfolio. Nothing leaves your browser.</p>
-
-  <div class="row">
-    <div class="col">
-      <div class="card">
-        <label>Upload Prices CSV</label>
-        <input id="fileInput" type="file" accept=".csv"/>
-        <p class="muted">Format: first column = <em>Date</em>, subsequent columns = asset tickers (Adjusted Close). Example snippet:</p>
-        <textarea rows="6" readonly>
-Date,SPY,IEF,GLD
-2024-01-02,474.35,94.85,190.92
-2024-01-03,469.63,95.17,191.41
-2024-01-04,472.28,95.24,192.19
-        </textarea>
-
-        <div class="grid2">
-          <div>
-            <label>Return Frequency</label>
-            <select id="freq">
-              <option value="252" selected>Daily (252 per year)</option>
-              <option value="52">Weekly (52 per year)</option>
-              <option value="12">Monthly (12 per year)</option>
-            </select>
-          </div>
-          <div>
-            <label>Risk-Free Rate (annualized, e.g. 0.02 = 2%)</label>
-            <input id="rf" type="number" step="0.0001" value="0.02"/>
-          </div>
-        </div>
-
-        <div class="grid2" style="margin-top:8px;">
-          <div>
-            <label>Risk-Aversion γ (higher = more risk-averse)</label>
-            <input id="gamma" type="number" step="0.1" value="3"/>
-          </div>
-          <div>
-            <label>Frontier Points</label>
-            <input id="nFrontier" type="number" step="10" value="120"/>
-          </div>
-        </div>
-
-        <div class="toggle">
-            <label class="toggle">
-              <input id="longOnly" type="checkbox">
-              Long-only (no shorting)
-            </label>
-        </div>
-
-        <div class="chips" style="margin-top:10px;">
-          <span class="chip">If unchecked: shorting allowed (closed-form)</span>
-          <span class="chip">Constraint: 1ᵀw = 1</span>
-        </div>
-
-        <div class="row" style="margin-top:10px; gap:8px;">
-          <button id="btnCompute">Compute Frontier & Weights</button>
-          <button id="btnDownloadGamma"  disabled>Download Gamma</button>
-          <button id="btnDownloadTan"    disabled>Download Tangency</button>
-          <button id="btnDownloadMVP"    disabled>Download MVP</button>
-        </div>
-        <p id="status" class="muted" style="margin-top:8px;"></p>
-      </div>
-    </div>
-
-    <div class="col">
-      <div class="card">
-        <label>Efficient Frontier + CML</label>
-        <canvas id="frontierChart" height="280"></canvas>
-        <div class="footer">
-          <span id="pfStats" class="muted"></span><br/>
-          <span id="tanStats" class="muted"></span>
-        </div>
-      </div>
-
-      <div class="card">
-        <label>Optimal Weights (for chosen γ)</label>
-        <div style="overflow:auto; max-height:260px;">
-          <table id="weightsTable">
-            <thead><tr><th>Asset</th><th>Weight</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <p class="muted">Long-only uses simplex projection (w ≥ 0, 1ᵀw=1). Exact long-only MVO requires a QP solver.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <strong>Notes & Tips</strong>
-    <ul>
-      <li><b>Data:</b> Use adjusted close prices. The app computes log returns.</li>
-      <li><b>Annualization:</b> Means & covariances scale by your selected frequency (252/52/12).</li>
-    </ul>
-  </div>
-
 <script>
 /* === Utilities === */
 const $ = sel => document.querySelector(sel);
@@ -152,10 +10,8 @@ function parseCSVToMatrix(csv) {
   if (parsed.errors.length) throw new Error(parsed.errors[0].message);
   const rows = parsed.data.filter(r => r && Object.values(r).some(v => v !== null && v !== ''));
   if (!rows.length) throw new Error('No data rows found');
-
   const headers = parsed.meta.fields;
   if (!headers || headers.length < 2) throw new Error('Need Date + at least one asset column');
-
   const tickers = headers.slice(1);
   const prices = rows.map(r => tickers.map(k => Number(r[k])));
   for (let i=0;i<prices.length;i++){
@@ -167,8 +23,7 @@ function parseCSVToMatrix(csv) {
 }
 
 function toReturns(prices, useLog=true) {
-  const T = prices.length;
-  const N = prices[0].length;
+  const T = prices.length, N = prices[0].length;
   const R = [];
   for (let t=1;t<T;t++){
     const row = new Array(N);
@@ -204,14 +59,9 @@ function scaleAnnual(mu, Sigma, freq) {
   return { muA, sigA };
 }
 
-/* Helpers */
-function toArray1D(x) {
-  if (Array.isArray(x)) return x.flat();
-  if (x && typeof x.toArray === 'function') return x.toArray().flat();
-  return [x];
-}
+function toArray1D(x) { if (Array.isArray(x)) return x.flat(); if (x && typeof x.toArray === 'function') return x.toArray().flat(); return [x]; }
 
-/* === Simplex projection: project v onto {w: w>=0, sum(w)=1} (Duchi et al. 2008) === */
+/* === Simplex projection (Duchi et al., 2008) === */
 function projectSimplex(v) {
   const n = v.length;
   const u = [...v].sort((a,b)=>b-a);
@@ -223,78 +73,110 @@ function projectSimplex(v) {
   }
   theta = (u.slice(0, rho+1).reduce((a,b)=>a+b,0) - 1)/(rho+1);
   const w = v.map(vi => Math.max(vi - theta, 0));
-  return w;
+  // exact sum=1 guard
+  const s = w.reduce((a,b)=>a+b,0);
+  return s>0 ? w.map(x=>x/s) : w;
 }
 
-/* Optionally: project AND renormalize (defensive) */
-function enforceLongOnly(w){
-  const p = projectSimplex(w);
-  // numerical guard to ensure exact sum=1
-  const s = p.reduce((a,b)=>a+b,0);
-  return s>0 ? p.map(x => x/s) : p;
-}
-
-/* === Closed-form weights (shorting allowed, 1ᵀw=1) === */
-function optimalWeightsGivenGamma(muExcess, Sigma, gamma) {
-  const N = muExcess.length;
-  const I = math.ones(N)._data;
-  const invS = math.inv(Sigma);
-  const invS_mu = math.multiply(invS, muExcess);
-  const invS_1  = math.multiply(invS, I);
-  const A = math.multiply(math.transpose(I), invS_1);
-  const B = math.multiply(math.transpose(I), invS_mu);
-  const term1 = math.multiply(1/gamma, invS_mu);
-  const term2 = math.multiply((gamma - B)/(gamma * A), invS_1);
-  const w = math.add(term1, term2);
-  return toArray1D(w);
-}
-
-/* MVP (unconstrained) then projected if long-only is set */
-function mvpWeights(Sigma) {
-  const N = Sigma.length;
-  const I = math.ones(N)._data;
-  const invS = math.inv(Sigma);
-  const invS1 = math.multiply(invS, I);
-  const A = math.multiply(math.transpose(I), invS1);
-  const w = math.divide(invS1, A);
-  return toArray1D(w);
-}
-
-/* Efficient Frontier (unconstrained) then optionally projected */
-function efficientFrontier(mu, Sigma, nPoints=120, opts={}) {
-  const { includeMu = [], margin = 0.35, longOnly = false } = opts;
-  const N = mu.length;
-  const I = math.ones(N)._data;
-  const invS = math.inv(Sigma);
-  const A = math.multiply(math.transpose(I), math.multiply(invS, I));
-  const B = math.multiply(math.transpose(I), math.multiply(invS, mu));
-  const C = math.multiply(math.transpose(mu), math.multiply(invS, mu));
-  const D = A*C - B*B;
-  if (D <= 0) throw new Error('Non-PD covariance or collinearity: D ≤ 0');
-
-  const mu_mvp = B / A;
-  const rawMin = Math.min(...mu);
-  const rawMax = Math.max(...mu);
-  let rLo = Math.min(mu_mvp, rawMin);
-  let rHi = Math.max(rawMax, ...includeMu);
-  const spanUp = Math.max(rHi - mu_mvp, 1e-6);
-  const spanDn = Math.max(mu_mvp - rLo, 1e-6);
-  rHi = rHi + margin * spanUp;
-  rLo = rLo - margin * spanDn;
-
-  const pts = [];
-  for (let k=0;k<nPoints;k++){
-    const r = rLo + (rHi - rLo)*k/(nPoints-1);
-    const alpha = (C - B*r)/D;
-    const beta  = (A*r - B)/D;
-    let w = math.multiply(invS, math.add(math.multiply(alpha, I), math.multiply(beta, mu)));
-    w = toArray1D(w);
-    if (longOnly) w = enforceLongOnly(w);
-    const var_ = math.multiply(math.transpose(w), math.multiply(Sigma, w));
-    const ret  = math.multiply(math.transpose(w), mu);
-    pts.push({ r: Number(ret), s: Math.sqrt(Math.max(Number(var_), 0)), w });
+/* ============ NEW: True constrained QP on simplex (APGD) ============ */
+/* Solve: minimize 0.5 w^T H w - b^T w  s.t. w ∈ Δ = {w >= 0, 1^T w = 1} */
+function qpOnSimplex(H, b, maxIter=5000, tol=1e-8) {
+  const N = b.length;
+  // Lipschitz constant L = largest eigenvalue of H (PSD). Cheap bound via Gershgorin:
+  let L = 0;
+  for (let i=0;i<N;i++){
+    let rowSum = 0;
+    for (let j=0;j<N;j++) rowSum += Math.abs(H[i][j]);
+    L = Math.max(L, rowSum);
   }
-  return pts;
+  if (!isFinite(L) || L<=0) L = 1;
+
+  // init at uniform simplex
+  let y = new Array(N).fill(1/N);
+  let w = y.slice();
+  let t = 1;
+
+  const grad = (x) => {
+    // H x - b
+    const g = new Array(N).fill(0);
+    for (let i=0;i<N;i++){
+      let acc = 0;
+      const Hi = H[i];
+      for (let j=0;j<N;j++) acc += Hi[j]*x[j];
+      g[i] = acc - b[i];
+    }
+    return g;
+  };
+
+  let g = grad(y);
+  for (let k=0;k<maxIter;k++){
+    // step
+    const step = 1.0 / L; // constant step; works well for PSD H
+    const z = new Array(N);
+    for (let i=0;i<N;i++) z[i] = y[i] - step * g[i];
+    const wNext = projectSimplex(z);
+
+    // Nesterov acceleration
+    const tNext = 0.5*(1 + Math.sqrt(1 + 4*t*t));
+    const yNext = wNext.map((wi, i) => wi + ((t - 1)/tNext)*(wi - w[i]));
+
+    // check convergence by ||w_next - w||
+    let diff = 0;
+    for (let i=0;i<N;i++){ const d = wNext[i] - w[i]; diff += d*d; }
+    if (diff <= tol*tol) return wNext;
+
+    // iterate
+    w = wNext; y = yNext; t = tNext; g = grad(y);
+  }
+  return w; // last iterate
+}
+
+/* === Exact constrained portfolios using the QP solver === */
+// MVP: minimize 0.5 w^T Σ w
+function mvp_true(Sigma) {
+  const N = Sigma.length;
+  const b = new Array(N).fill(0);
+  return qpOnSimplex(Sigma, b);
+}
+
+// Gamma: maximize (μ - r_f 1)^T w - (γ/2) w^T Σ w  ⇔ minimize 0.5 (γΣ) w^T w - (μ - r_f 1)^T w
+function gamma_true(mu, Sigma, rf, gamma) {
+  const N = mu.length;
+  const one = new Array(N).fill(1);
+  const b = mu.map((m,i) => m - rf*one[i]);            // μ_excess
+  const H = Sigma.map(row => row.map(v => v * gamma)); // γΣ
+  return qpOnSimplex(H, b);
+}
+
+/* Efficient frontier via β-sweep: for each β >= 0 solve min 1/2 w^T Σ w - β μ^T w */
+function frontier_true(mu, Sigma, rf, n=120) {
+  const betas = [];
+  // Sweep β on a log-ish grid to cover conservative → aggressive
+  const betaMin = 1e-4, betaMax = 1e3;
+  for (let k=0;k<n;k++){
+    const t = k/(n-1);
+    // smooth grid (exp on [betaMin,betaMax])
+    const beta = betaMin * Math.pow(betaMax/betaMin, t);
+    betas.push(beta);
+  }
+  const pts = [];
+  const ws  = [];
+  for (const beta of betas){
+    const b = mu.map(m => beta*m);
+    const w = qpOnSimplex(Sigma, b, 4000, 1e-8);
+    const ret = Number(math.multiply(math.transpose(w), mu));
+    const var_ = Number(math.multiply(math.transpose(w), math.multiply(Sigma, w)));
+    pts.push({ r: ret, s: Math.sqrt(Math.max(var_,0)), w });
+    ws.push(w);
+  }
+  // Pick tangency as frontier point with max Sharpe
+  let bestIdx = 0, bestSharpe = -1e99;
+  for (let i=0;i<pts.length;i++){
+    const sh = (pts[i].r - rf) / Math.max(pts[i].s, 1e-12);
+    if (sh > bestSharpe){ bestSharpe = sh; bestIdx = i; }
+  }
+  const tan = pts[bestIdx];
+  return { pts, tan };
 }
 
 /* Stats */
@@ -305,31 +187,35 @@ function portfolioStats(w, mu, Sigma) {
   return { ret: Number(ret), vol: Math.sqrt(Math.max(Number(var_), 0)) };
 }
 
-/* Tangency (max Sharpe), then optionally projected */
-function tangencyPortfolio(mu, Sigma, rf, longOnly=false) {
-  const N = mu.length;
-  const I = math.ones(N)._data;
+/* === Unconstrained formulas (kept for "shorting allowed") === */
+function optimalWeightsGivenGamma_unc(muExcess, Sigma, gamma) {
+  const I = math.ones(muExcess.length)._data;
   const invS = math.inv(Sigma);
-  const muEx = math.subtract(mu, math.multiply(rf, I));        // μ - r_f 1
-  let num  = math.multiply(invS, muEx);                         // Σ^{-1}(μ - r_f 1)
-  let den  = math.multiply(math.transpose(I), num);             // 1ᵀΣ^{-1}(μ - r_f 1)
-  let wT   = toArray1D(math.divide(num, den));                  // sum to 1 (unconstrained)
-  if (longOnly) wT = enforceLongOnly(wT);                       // project to long-only
+  const invS_mu = math.multiply(invS, muExcess);
+  const invS_1  = math.multiply(invS, I);
+  const A = math.multiply(math.transpose(I), invS_1);
+  const B = math.multiply(math.transpose(I), invS_mu);
+  const term1 = math.multiply(1/gamma, invS_mu);
+  const term2 = math.multiply((gamma - B)/(gamma * A), invS_1);
+  return toArray1D(math.add(term1, term2));
+}
+function mvp_unc(Sigma) {
+  const I = math.ones(Sigma.length)._data;
+  const invS = math.inv(Sigma);
+  const invS1 = math.multiply(invS, I);
+  const A = math.multiply(math.transpose(I), invS1);
+  return toArray1D(math.divide(invS1, A));
+}
+function tangency_unc(mu, Sigma, rf) {
+  const I = math.ones(mu.length)._data;
+  const invS = math.inv(Sigma);
+  const muEx = math.subtract(mu, math.multiply(rf, I));
+  const num  = math.multiply(invS, muEx);
+  const den  = math.multiply(math.transpose(I), num);
+  const wT   = toArray1D(math.divide(num, den));
   const { ret, vol } = portfolioStats(wT, mu, Sigma);
   const sharpe = (ret - rf) / Math.max(vol, 1e-12);
   return { wT, ret, vol, sharpe };
-}
-
-/* CML points (visual) */
-function makeCMLPoints(rf, tanVol, tanRet, xMax, n=100) {
-  const slope = (tanRet - rf) / Math.max(tanVol, 1e-12);
-  const pts = [];
-  for (let i=0;i<n;i++){
-    const x = (xMax * i)/(n-1);
-    const y = rf + slope * x;
-    pts.push({ x, y });
-  }
-  return pts;
 }
 
 /* === UI wiring === */
@@ -345,7 +231,7 @@ $('#btnCompute').addEventListener('click', async () => {
     const freq = Number($('#freq').value);
     const rf = Number($('#rf').value) || 0;
     const gamma = Number($('#gamma').value);
-    const nFrontier = Math.max(20, Number($('#nFrontier').value));
+    const nFrontier = Math.max(40, Number($('#nFrontier').value));
     const longOnly = $('#longOnly').checked;
 
     const { tickers, prices } = parseCSVToMatrix(text);
@@ -354,31 +240,66 @@ $('#btnCompute').addEventListener('click', async () => {
     const { cov, mean: m } = covarianceMatrix(R);
     const { muA, sigA } = scaleAnnual(m, cov, freq);
 
-    // === Gamma (uses μ - r_f), then enforce long-only if requested ===
-    const muExcess = muA.map(u => u - rf);
-    let wG = optimalWeightsGivenGamma(muExcess, sigA, gamma);
-    if (longOnly) wG = enforceLongOnly(wG);
+    let wG, wM, tan, front;
+    if (longOnly) {
+      // === TRUE constrained (Goal B) ===
+      wG = gamma_true(muA, sigA, rf, gamma);
+      wM = mvp_true(sigA);
+      const { pts, tan: tanPt } = frontier_true(muA, sigA, rf, nFrontier);
+      front = pts;
+      tan = { wT: tanPt.w, ret: tanPt.r, vol: tanPt.s, sharpe: (tanPt.r - rf)/Math.max(tanPt.s,1e-12) };
+    } else {
+      // === Unconstrained (closed-form) ===
+      const muExcess = muA.map(u => u - rf);
+      wG = optimalWeightsGivenGamma_unc(muExcess, sigA, gamma);
+      wM = mvp_unc(sigA);
+      const t = tangency_unc(muA, sigA, rf);
+      tan = t;
+
+      // Make a visual frontier by the analytic sweep (unconstrained)
+      const pts = [];
+      const N = muA.length;
+      const I = math.ones(N)._data, invS = math.inv(sigA);
+      const A = math.multiply(math.transpose(I), math.multiply(invS, I));
+      const B = math.multiply(math.transpose(I), math.multiply(invS, muA));
+      const C = math.multiply(math.transpose(muA), math.multiply(invS, muA));
+      const D = A*C - B*B;
+      const mu_mvp = B/A;
+      let rLo = Math.min(mu_mvp, Math.min(...muA));
+      let rHi = Math.max(Math.max(...muA), tan.ret);
+      const spanUp = Math.max(rHi - mu_mvp, 1e-6);
+      const spanDn = Math.max(mu_mvp - rLo, 1e-6);
+      rHi = rHi + 0.35*spanUp; rLo = rLo - 0.35*spanDn;
+      for (let k=0;k<nFrontier;k++){
+        const r = rLo + (rHi - rLo)*k/(nFrontier-1);
+        const alpha = (C - B*r)/D;
+        const beta  = (A*r - B)/D;
+        let w = math.multiply(invS, math.add(math.multiply(alpha, I), math.multiply(beta, muA)));
+        w = toArray1D(w);
+        const var_ = math.multiply(math.transpose(w), math.multiply(sigA, w));
+        const ret  = math.multiply(math.transpose(w), muA);
+        pts.push({ r: Number(ret), s: Math.sqrt(Math.max(Number(var_),0)), w });
+      }
+      front = pts;
+    }
+
     const statsG = portfolioStats(wG, muA, sigA);
 
-    // === Tangency ===
-    const { wT, ret: tanRet, vol: tanVol, sharpe: tanSharpe } =
-      tangencyPortfolio(muA, sigA, rf, longOnly);
+    // === CML (visual) ===
+    const maxSigma = Math.max(tan.vol, statsG.vol, ...front.map(p => p.s)) * 1.05;
+    const cmlPts = (function(){
+      const slope = (tan.ret - rf) / Math.max(tan.vol, 1e-12);
+      const pts = [];
+      for (let i=0;i<100;i++){
+        const x = (maxSigma * i)/(100-1);
+        pts.push({ x, y: rf + slope * x });
+      }
+      return pts;
+    })();
 
-    // === MVP ===
-    let wM = mvpWeights(sigA);
-    if (longOnly) wM = enforceLongOnly(wM);
-
-    // === Frontier (ensure it covers γ and Tangency returns) ===
-    const frontPts = efficientFrontier(muA, sigA, nFrontier,
-      { includeMu: [statsG.ret, tanRet], margin: 0.35, longOnly });
-
-    // === CML (visual only) ===
-    const maxSigma = Math.max(tanVol, statsG.vol, ...frontPts.map(p => p.s)) * 1.05;
-    const cmlPts = makeCMLPoints(rf, tanVol, tanRet, maxSigma, 100);
-
-    // Save for downloads (show long-only feasible weights)
+    // Save for downloads
     weightsGamma = tickers.map((t,i) => ({ Asset: t, Weight: wG[i] }));
-    weightsTan   = tickers.map((t,i) => ({ Asset: t, Weight: wT[i] }));
+    weightsTan   = tickers.map((t,i) => ({ Asset: t, Weight: tan.wT[i] }));
     weightsMVP   = tickers.map((t,i) => ({ Asset: t, Weight: wM[i] }));
 
     // Table: γ-weights
@@ -390,24 +311,19 @@ $('#btnCompute').addEventListener('click', async () => {
       tbody.appendChild(tr);
     }
 
-    // Enable download buttons
-    $('#btnDownloadGamma').disabled = false;
-    $('#btnDownloadTan').disabled   = false;
-    $('#btnDownloadMVP').disabled   = false;
-
     // Stats text
     $('#pfStats').textContent =
-      `Optimal (γ=${gamma}${longOnly? ", long-only":""}):  E[μ]=${(statsG.ret*100).toFixed(2)}%  |  σ=${(statsG.vol*100).toFixed(2)}%  |  Sharpe≈${((statsG.ret - rf)/Math.max(statsG.vol,1e-9)).toFixed(2)}`;
+      `Optimal (γ=${gamma}${longOnly? ", long-only (QP)":""}):  E[μ]=${(statsG.ret*100).toFixed(2)}%  |  σ=${(statsG.vol*100).toFixed(2)}%  |  Sharpe≈${((statsG.ret - rf)/Math.max(statsG.vol,1e-9)).toFixed(2)}`;
     $('#tanStats').textContent =
-      `Tangency${longOnly? " (projected long-only)":""}:  E[μ]=${(tanRet*100).toFixed(2)}%  |  σ=${(tanVol*100).toFixed(2)}%  |  Sharpe=${tanSharpe.toFixed(2)}  |  rf=${(rf*100).toFixed(2)}%`;
+      `Tangency${longOnly? " (true constrained)":""}:  E[μ]=${(tan.ret*100).toFixed(2)}%  |  σ=${(tan.vol*100).toFixed(2)}%  |  Sharpe=${tan.sharpe.toFixed(2)}  |  rf=${(rf*100).toFixed(2)}%`;
 
     // Plot
     const data = {
-      labels: frontPts.map(_=> ''),
+      labels: front.map(_=> ''),
       datasets: [
-        { label: 'Efficient Frontier', data: frontPts.map(p => ({ x: p.s, y: p.r })), showLine: true, pointRadius: 2 },
+        { label: 'Efficient Frontier', data: front.map(p => ({ x: p.s, y: p.r })), showLine: true, pointRadius: 2 },
         { label: 'CML (through Tangency)', data: cmlPts, showLine: true, pointRadius: 0, borderDash: [6,4] },
-        { label: 'Tangency Portfolio', data: [{ x: tanVol, y: tanRet }], pointRadius: 6 },
+        { label: 'Tangency Portfolio', data: [{ x: tan.vol, y: tan.ret }], pointRadius: 6 },
         { label: 'Your Portfolio (γ)', data: [{ x: statsG.vol, y: statsG.ret }], pointRadius: 6 }
       ]
     };
@@ -455,19 +371,8 @@ function downloadCSV(rows, filename) {
   URL.revokeObjectURL(url);
 }
 
-/* Three download buttons */
-document.getElementById('btnDownloadGamma').addEventListener('click', () => {
-  if (!weightsGamma) return;
-  downloadCSV(weightsGamma, 'weights_gamma.csv');
-});
-document.getElementById('btnDownloadTan').addEventListener('click', () => {
-  if (!weightsTan) return;
-  downloadCSV(weightsTan, 'weights_tangency.csv');
-});
-document.getElementById('btnDownloadMVP').addEventListener('click', () => {
-  if (!weightsMVP) return;
-  downloadCSV(weightsMVP, 'weights_mvp.csv');
-});
+/* Download buttons */
+document.getElementById('btnDownloadGamma').addEventListener('click', () => { if (weightsGamma) downloadCSV(weightsGamma, 'weights_gamma.csv'); });
+document.getElementById('btnDownloadTan').addEventListener('click',   () => { if (weightsTan)   downloadCSV(weightsTan,   'weights_tangency.csv'); });
+document.getElementById('btnDownloadMVP').addEventListener('click',   () => { if (weightsMVP)   downloadCSV(weightsMVP,   'weights_mvp.csv'); });
 </script>
-</body>
-</html>
