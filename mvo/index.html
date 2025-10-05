@@ -127,7 +127,8 @@ Date,SPY,IEF,GLD
             <tbody></tbody>
           </table>
         </div>
-        <p class="muted">Long-only uses simplex projection (w ≥ 0, 1ᵀw=1). Exact long-only MVO requires a QP solver.</p>
+        <p class="muted">Long-only solves a convex QP on the simplex (w ≥ 0, 1ᵀw = 1), producing the true constrained optimum.</p>
+
       </div>
     </div>
   </div>
@@ -443,6 +444,10 @@ $('#btnCompute').addEventListener('click', async () => {
     weightsGamma = tickers.map((t,i) => ({ Asset: t, Weight: wG[i] }));
     weightsTan   = tickers.map((t,i) => ({ Asset: t, Weight: tan.wT[i] }));
     weightsMVP   = tickers.map((t,i) => ({ Asset: t, Weight: wM[i] }));
+
+    document.getElementById('btnDownloadGamma').disabled = false;
+    document.getElementById('btnDownloadTan').disabled   = false;
+    document.getElementById('btnDownloadMVP').disabled   = false;
 
     // Table: γ-weights
     const tbody = $('#weightsTable tbody');
