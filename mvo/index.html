@@ -1,3 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mean–Variance Optimizer</title>
+
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color-scheme: light dark; }
+      body { margin: 20px; }
+      img, canvas, textarea { max-width: 100%; }
+      h1 { margin: 0 0 8px; font-size: 1.5rem; }
+      .card { border: 1px solid #ccc; border-radius: 12px; padding: 16px; margin: 10px 0; overflow: hidden; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+      .col { flex: 1 1 340px; min-width: 280px; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .grid2 > * { min-width: 0; }
+      @media (max-width:760px){ .grid2{ grid-template-columns: 1fr; } }
+      label { font-weight: 600; display:block; margin: 8px 0 4px; }
+      .muted { opacity: 0.8; font-size: 0.92rem; }
+      .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eee; margin-left:6px; font-size:0.8rem; }
+      .inline { display:inline-flex; gap:8px; align-items:center; }
+      .warn { color:#a33; font-weight:600; }
+      .success { color:#2a7; font-weight:600; }
+      .right { text-align:right; }
+      .footer { margin-top: 16px; font-size: 0.9rem; }
+      .chips { display:flex; gap:8px; flex-wrap:wrap; }
+      .chip { border:1px solid #ddd; border-radius:999px; padding:4px 10px; font-size:.85rem; }
+      input, select, textarea { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #bbb; }
+      button { padding: 8px; border-radius: 8px; border: 1px solid #bbb; cursor: pointer; }
+      .card .row button { width: auto; flex: 1 1 0; min-width: 140px; }
+      textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow: auto; }
+
+      /* --- FIX: keep checkbox + text together --- */
+      .toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; white-space: nowrap; }
+      .toggle input { margin: 0; }
+
+    </style>
+
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjs@11.11.1/lib/browser/math.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <h1>Mean–Variance Optimizer</h1>
+  <p class="muted">Upload a CSV of prices, pick settings, and get the efficient frontier, CML, tangency, and γ-portfolio. Nothing leaves your browser.</p>
+
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <label>Upload Prices CSV</label>
+        <input id="fileInput" type="file" accept=".csv"/>
+        <p class="muted">Format: first column = <em>Date</em>, subsequent columns = asset tickers (Adjusted Close). Example snippet:</p>
+        <textarea rows="6" readonly>
+Date,SPY,IEF,GLD
+2024-01-02,474.35,94.85,190.92
+2024-01-03,469.63,95.17,191.41
+2024-01-04,472.28,95.24,192.19
+        </textarea>
+
+        <div class="grid2">
+          <div>
+            <label>Return Frequency</label>
+            <select id="freq">
+              <option value="252" selected>Daily (252 per year)</option>
+              <option value="52">Weekly (52 per year)</option>
+              <option value="12">Monthly (12 per year)</option>
+            </select>
+          </div>
+          <div>
+            <label>Risk-Free Rate (annualized, e.g. 0.02 = 2%)</label>
+            <input id="rf" type="number" step="0.0001" value="0.02"/>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Risk-Aversion γ (higher = more risk-averse)</label>
+            <input id="gamma" type="number" step="0.1" value="3"/>
+          </div>
+          <div>
+            <label>Frontier Points</label>
+            <input id="nFrontier" type="number" step="10" value="120"/>
+          </div>
+        </div>
+
+        <div class="toggle">
+            <label class="toggle">
+              <input id="longOnly" type="checkbox">
+              Long-only (no shorting)
+            </label>
+        </div>
+
+        <div class="chips" style="margin-top:10px;">
+          <span class="chip">If unchecked: shorting allowed (closed-form)</span>
+          <span class="chip">Constraint: 1ᵀw = 1</span>
+        </div>
+
+        <div class="row" style="margin-top:10px; gap:8px;">
+          <button id="btnCompute">Compute Frontier & Weights</button>
+          <button id="btnDownloadGamma"  disabled>Download Gamma</button>
+          <button id="btnDownloadTan"    disabled>Download Tangency</button>
+          <button id="btnDownloadMVP"    disabled>Download MVP</button>
+        </div>
+        <p id="status" class="muted" style="margin-top:8px;"></p>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card">
+        <label>Efficient Frontier + CML</label>
+        <canvas id="frontierChart" height="280"></canvas>
+        <div class="footer">
+          <span id="pfStats" class="muted"></span><br/>
+          <span id="tanStats" class="muted"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <label>Optimal Weights (for chosen γ)</label>
+        <div style="overflow:auto; max-height:260px;">
+          <table id="weightsTable">
+            <thead><tr><th>Asset</th><th>Weight</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="muted">Long-only uses simplex projection (w ≥ 0, 1ᵀw=1). Exact long-only MVO requires a QP solver.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <strong>Notes & Tips</strong>
+    <ul>
+      <li><b>Data:</b> Use adjusted close prices. The app computes log returns.</li>
+      <li><b>Annualization:</b> Means & covariances scale by your selected frequency (252/52/12).</li>
+    </ul>
+  </div>
+
 <script>
 /* === Utilities === */
 const $ = sel => document.querySelector(sel);
@@ -376,3 +518,6 @@ document.getElementById('btnDownloadGamma').addEventListener('click', () => { if
 document.getElementById('btnDownloadTan').addEventListener('click',   () => { if (weightsTan)   downloadCSV(weightsTan,   'weights_tangency.csv'); });
 document.getElementById('btnDownloadMVP').addEventListener('click',   () => { if (weightsMVP)   downloadCSV(weightsMVP,   'weights_mvp.csv'); });
 </script>
+
+</body>
+</html>
