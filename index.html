@@ -442,6 +442,7 @@
           <button class="pill" data-filter="ai" type="button" aria-pressed="false">AI/ML</button>
           <button class="pill" data-filter="systems" type="button" aria-pressed="false">Systems</button>
           <button class="pill" data-filter="web" type="button" aria-pressed="false">Web</button>
+          <button class="pill" data-filter="finance" type="button" aria-pressed="false">Finance</button>
         </div>
       </div>
 
@@ -477,8 +478,21 @@
             <a class="btn" href="#projects">Top</a>
           </div>
         </article>
+
+        <article class="card project" data-tags="web ai finance" data-title="Mean–Variance Optimizer Web App">
+          <div class="meta"><span class="tag">Web</span> <span class="tag">Finance</span></div>
+          <h3>Mean–Variance Portfolio Optimizer</h3>
+          <p>Interactive Streamlit app that visualizes the efficient frontier, Capital Market Line, and portfolios under variable risk aversion γ. Built with PyPortfolioOpt, CVXPY, and Matplotlib.</p>
+          <div class="actions">
+            <button class="btn" data-modal="mvo" type="button">Details</button>
+            <a class="btn" href="https://<your-repo-or-render-url>" target="_blank" rel="noopener">Launch</a>
+          </div>
+        </article>
+
       </div>
     </section>
+
+
 
     <section id="teaching" class="section container reveal">
       <h2>Teaching & Tutoring</h2>
@@ -543,6 +557,20 @@
       </div>
     </form>
   </dialog>
+
+  <dialog id="modal-mvo">
+      <form method="dialog" style="margin:0">
+        <div style="padding:20px">
+          <h3 style="margin-top:0">Mean–Variance Portfolio Optimizer</h3>
+          <p>Visualizes efficient frontier and CML under different γ values. Lets users explore long-only and short-allowed portfolios interactively.</p>
+          <p><strong>Stack:</strong> Streamlit, PyPortfolioOpt, CVXPY, Matplotlib.</p>
+          <menu style="display:flex;justify-content:flex-end;gap:8px;margin:0;margin-top:14px">
+            <button class="btn">Close</button>
+          </menu>
+        </div>
+      </form>
+    </dialog>
+
   <dialog id="modal-errands">
     <form method="dialog" style="margin:0">
       <div style="padding:20px">
