@@ -116,7 +116,7 @@ Date,SPY,IEF,GLD
   <div class="card">
     <strong>Notes</strong>
     <ul class="muted">
-      <li>Returns = <em>log</em> returns. Annualization: μ×freq, Σ×freq.</li>
+      <li><b>PyPortfolioOpt-style moments:</b> simple returns; μ = geometric annualized mean; Σ = sample cov from simple returns (annualized).</li>
       <li>QP: Accelerated projected gradient with warm-starts; small diagonal jitter for numerical stability.</li>
     </ul>
   </div>
@@ -129,7 +129,7 @@ let chart;
 let lastRun = { ready:false, longOnly:true, params:{} };
 let weightsGamma=null, weightsTan=null, weightsMVP=null;
 
-/* ---------- CSV / math helpers ---------- */
+/* ---------- CSV helpers ---------- */
 function parseCSVToMatrix(csv){
   const parsed = Papa.parse(csv.trim(), { header:true, dynamicTyping:true });
   if (parsed.errors.length) throw new Error(parsed.errors[0].message);
@@ -146,31 +146,49 @@ function parseCSVToMatrix(csv){
   }
   return { tickers, prices };
 }
-function toReturns(prices){ // log returns
+
+/* ---------- Returns & moments (PyPortfolioOpt-style) ---------- */
+// simple (arithmetic) period returns
+function toSimpleReturns(prices){
   const T = prices.length, N = prices[0].length, R=[];
   for (let t=1;t<T;t++){
     const row = new Array(N);
-    for (let i=0;i<N;i++) row[i] = Math.log(prices[t][i]/prices[t-1][i]);
+    for (let i=0;i<N;i++) row[i] = (prices[t][i]/prices[t-1][i]) - 1;
     R.push(row);
   }
   return R;
 }
-const mean = v => v.reduce((a,b)=>a+b,0)/v.length;
-const column = (M,j) => M.map(r => r[j]);
-function covarianceMatrix(R){
-  const T = R.length, N = R[0].length;
-  const means = Array.from({length:N}, (_,j)=> mean(column(R,j)));
-  const S = math.zeros(N,N)._data;
+
+// geometric annualized mean from simple returns; covariance from simple returns (annualized)
+function expectedReturns_PyPO(R, freq, compounding=true){
+  const T = R.length, N = R[0].length, muA = new Array(N).fill(0);
+  for (let j=0;j<N;j++){
+    const col = R.map(r => r[j]);
+    if (compounding){
+      let prod=1.0; for (let t=0;t<T;t++) prod *= (1 + col[t]);
+      muA[j] = Math.pow(Math.max(prod,1e-12), freq / T) - 1;
+    } else {
+      const m = col.reduce((a,b)=>a+b,0) / T;
+      muA[j] = m * freq;
+    }
+  }
+  return muA;
+}
+function sampleCov_PyPO(R, freq){
+  const T=R.length, N=R[0].length;
+  const means = Array.from({length:N}, (_,j)=> R.reduce((a,row)=>a+row[j],0)/T);
+  const S = Array.from({length:N}, ()=> new Array(N).fill(0));
   for (let i=0;i<N;i++){
     for (let j=0;j<N;j++){
-      let s=0;
-      for (let t=0;t<T;t++) s += (R[t][i]-means[i])*(R[t][j]-means[j]);
+      let s=0; for (let t=0;t<T;t++){ const di=R[t][i]-means[i], dj=R[t][j]-means[j]; s += di*dj; }
       S[i][j] = s/(T-1);
     }
   }
-  return { cov:S, mean:means };
+  // annualize covariance linearly
+  for (let i=0;i<N;i++) for (let j=0;j<N;j++) S[i][j] *= freq;
+  return S;
 }
-function scaleAnnual(mu,S,freq){ return { muA: mu.map(m=>m*freq), sigA: math.multiply(S,freq) }; }
+
 function toArray1D(x){ if (Array.isArray(x)) return x.flat(); if (x && typeof x.toArray==='function') return x.toArray().flat(); return [x]; }
 
 /* ---------- Simplex projection (Duchi 2008) ---------- */
@@ -183,7 +201,7 @@ function projectSimplex(v){
   return s>0 ? w.map(x=>x/s) : w;
 }
 
-/* ---------- QP on simplex (APGD, warm-start, tight tol) ---------- */
+/* ---------- QP on simplex (APGD, warm-start) ---------- */
 function qpOnSimplex(H,b,maxIter=15000,tol=1e-10,w0=null){
   const N=b.length;
   let L=0; // Gershgorin bound
@@ -214,7 +232,7 @@ function qpOnSimplex(H,b,maxIter=15000,tol=1e-10,w0=null){
 
 /* ---------- Portfolios (constrained + unconstrained) ---------- */
 function mvp_true(Sigma){ const N=Sigma.length, b=new Array(N).fill(0); return qpOnSimplex(Sigma,b); }
-// γ uses raw μ (no rf)
+// γ uses raw μ (no rf), matching the Google Colab you built
 function gamma_true(mu,Sigma,rf,gamma){ const H=Sigma.map(r=>r.map(v=>v*gamma)); const b=mu.slice(); return qpOnSimplex(H,b); }
 
 function portfolioStats(w,mu,Sigma){
@@ -255,7 +273,6 @@ function quad(w,S){ let v=0; for(let i=0;i<w.length;i++){ let row=0; for(let j=0
 function frontier_true(mu,Sigma,rf,n=120){
   const stats = w => { const r=dot(w,mu); const s=Math.sqrt(Math.max(quad(w,Sigma),0)); return {r,s,sh:(r-rf)/Math.max(s,1e-12)}; };
 
-  // coarse beta grid
   const betaMin=1e-4, betaMax=1e3, betas=[];
   for (let k=0;k<n;k++){ const t=k/(n-1); betas.push(betaMin*Math.pow(betaMax/betaMin,t)); }
 
@@ -267,8 +284,8 @@ function frontier_true(mu,Sigma,rf,n=120){
     if (s.sh>best.sh) best={ sh:s.sh, beta, w };
   }
 
-  // golden-section refine around best beta (continuous search)
-  const phi=(Math.sqrt(5)-1)/2, span=2; // +/- two log units
+  // golden-section refine around best beta
+  const phi=(Math.sqrt(5)-1)/2, span=2;
   let lo=Math.max(Math.log(betaMin), Math.log(best.beta)-span);
   let hi=Math.min(Math.log(betaMax), Math.log(best.beta)+span);
   const evalSharpe = (lx,w0)=>{ const b=mu.map(m=>Math.exp(lx)*m); const w=qpOnSimplex(Sigma,b,12000,1e-10,w0); const s=stats(w); return { ...s, w, lx }; };
@@ -306,16 +323,18 @@ $('#btnCompute').addEventListener('click', async ()=>{
 
     const { tickers, prices } = parseCSVToMatrix(text);
     if (prices.length < 3) throw new Error('Need at least 3 rows of prices.');
-    const R = toReturns(prices);
-    const { cov, mean:m } = covarianceMatrix(R);
-    const { muA, sigA } = scaleAnnual(m, cov, freq);
+
+    // === PyPortfolioOpt-style moments ===
+    const R   = toSimpleReturns(prices);
+    const muA = expectedReturns_PyPO(R, freq, true);   // geometric mean
+    const sigA= sampleCov_PyPO(R, freq);               // sample cov (annualized)
 
     // tiny jitter for stability
     for (let i=0;i<sigA.length;i++) sigA[i][i] += 1e-12;
 
     let wG, wM, tan, front;
     if (longOnly){
-      wG = gamma_true(muA, sigA, rf, gamma); // γ uses raw μ
+      wG = gamma_true(muA, sigA, rf, gamma); // γ uses raw μ (no rf)
       wM = mvp_true(sigA);
       const { pts, tan:tanPt } = frontier_true(muA, sigA, rf, nFrontier);
       front = pts;
@@ -356,7 +375,7 @@ $('#btnCompute').addEventListener('click', async ()=>{
     const maxSigma = Math.max(tan.vol, statsG.vol, ...front.map(p=>p.s)) * 1.05;
     const cmlPts = (()=>{ const slope=(tan.ret - rf)/Math.max(tan.vol,1e-12); const pts=[]; for(let i=0;i<100;i++){ const x=(maxSigma*i)/(99); pts.push({x, y: rf + slope*x}); } return pts; })();
 
-    // Save for downloads (current run only)
+    // Save for downloads
     weightsGamma = tickers.map((t,i)=>({ Asset:t, Weight:Number(wG[i]) }));
     weightsTan   = tickers.map((t,i)=>({ Asset:t, Weight:Number(tan.w[i]) }));
     weightsMVP   = tickers.map((t,i)=>({ Asset:t, Weight:Number(wM[i]) }));
