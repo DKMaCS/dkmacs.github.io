@@ -310,7 +310,7 @@ $('#btnCompute').addEventListener('click', async () => {
     const { muA, sigA } = scaleAnnual(m, cov, freq);
 
     // Frontier
-    const frontPts = efficientFrontier(muA, sigA, nFrontier);
+    const frontPts = efficientFrontier(muA, sigA, nFrontier, 1.0);
 
     // Tangency + CML
     const { wT, ret: tanRet, vol: tanVol, sharpe: tanSharpe } = tangencyPortfolio(muA, sigA, rf);
