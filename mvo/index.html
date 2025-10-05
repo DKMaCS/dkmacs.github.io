@@ -4,57 +4,45 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Mean–Variance Optimizer</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color-scheme:light dark}
+    body{margin:20px}
+    h1{margin:0 0 8px;font-size:1.5rem}
+    .card{border:1px solid #ccc;border-radius:12px;padding:16px;margin:10px 0;overflow:hidden}
+    .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+    .col{flex:1 1 340px;min-width:280px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .grid2>*{min-width:0}
+    @media (max-width:760px){.grid2{grid-template-columns:1fr}}
+    label{font-weight:600;display:block;margin:8px 0 4px}
+    .muted{opacity:.8;font-size:.92rem}
+    .chip{border:1px solid #ddd;border-radius:999px;padding:4px 10px;font-size:.85rem}
+    input,select,textarea{width:100%;padding:8px;border-radius:8px;border:1px solid #bbb}
+    button{padding:8px;border-radius:8px;border:1px solid #bbb;cursor:pointer}
+    .card .row button{width:auto;flex:1 1 0;min-width:140px}
+    textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;overflow:auto}
+    .toggle{display:inline-flex;align-items:center;gap:8px;margin-top:8px;white-space:nowrap}
+    .success{color:#2a7;font-weight:600}
+    .warn{color:#a33;font-weight:600}
+  </style>
 
-    <style>
-      *, *::before, *::after { box-sizing: border-box; }
-      :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color-scheme: light dark; }
-      body { margin: 20px; }
-      img, canvas, textarea { max-width: 100%; }
-      h1 { margin: 0 0 8px; font-size: 1.5rem; }
-      .card { border: 1px solid #ccc; border-radius: 12px; padding: 16px; margin: 10px 0; overflow: hidden; }
-      .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-      .col { flex: 1 1 340px; min-width: 280px; }
-      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      .grid2 > * { min-width: 0; }
-      @media (max-width:760px){ .grid2{ grid-template-columns: 1fr; } }
-      label { font-weight: 600; display:block; margin: 8px 0 4px; }
-      .muted { opacity: 0.8; font-size: 0.92rem; }
-      .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eee; margin-left:6px; font-size:0.8rem; }
-      .inline { display:inline-flex; gap:8px; align-items:center; }
-      .warn { color:#a33; font-weight:600; }
-      .success { color:#2a7; font-weight:600; }
-      .right { text-align:right; }
-      .footer { margin-top: 16px; font-size: 0.9rem; }
-      .chips { display:flex; gap:8px; flex-wrap:wrap; }
-      .chip { border:1px solid #ddd; border-radius:999px; padding:4px 10px; font-size:.85rem; }
-      input, select, textarea { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #bbb; }
-      button { padding: 8px; border-radius: 8px; border: 1px solid #bbb; cursor: pointer; }
-      .card .row button { width: auto; flex: 1 1 0; min-width: 140px; }
-      textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow: auto; }
-
-      /* --- FIX: keep checkbox + text together --- */
-      .toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; white-space: nowrap; }
-      .toggle input { margin: 0; }
-
-    </style>
-
-
-  <!-- Libraries -->
+  <!-- Libs -->
   <script src="https://cdn.jsdelivr.net/npm/mathjs@11.11.1/lib/browser/math.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <h1>Mean–Variance Optimizer</h1>
-  <p class="muted">Upload a CSV of prices, pick settings, and get the efficient frontier, CML, tangency, and γ-portfolio. Nothing leaves your browser.</p>
+  <p class="muted">Upload prices, choose settings, and compute the efficient frontier, CML, tangency, and γ-portfolio — all in your browser.</p>
 
   <div class="row">
     <div class="col">
       <div class="card">
         <label>Upload Prices CSV</label>
         <input id="fileInput" type="file" accept=".csv"/>
-        <p class="muted">Format: first column = <em>Date</em>, subsequent columns = asset tickers (Adjusted Close). Example snippet:</p>
-        <textarea rows="6" readonly>
+        <p class="muted">Format: first column = <em>Date</em>, subsequent columns = tickers (Adjusted Close).</p>
+        <textarea rows="5" readonly>
 Date,SPY,IEF,GLD
 2024-01-02,474.35,94.85,190.92
 2024-01-03,469.63,95.17,191.41
@@ -65,9 +53,9 @@ Date,SPY,IEF,GLD
           <div>
             <label>Return Frequency</label>
             <select id="freq">
-              <option value="252" selected>Daily (252 per year)</option>
-              <option value="52">Weekly (52 per year)</option>
-              <option value="12">Monthly (12 per year)</option>
+              <option value="252" selected>Daily (252/yr)</option>
+              <option value="52">Weekly (52/yr)</option>
+              <option value="12">Monthly (12/yr)</option>
             </select>
           </div>
           <div>
@@ -88,18 +76,11 @@ Date,SPY,IEF,GLD
         </div>
 
         <div class="toggle">
-            <label class="toggle">
-              <input id="longOnly" type="checkbox">
-              Long-only (no shorting)
-            </label>
+          <input id="longOnly" type="checkbox" checked>
+          <label for="longOnly">Long-only (no shorting)</label>
         </div>
 
-        <div class="chips" style="margin-top:10px;">
-          <span class="chip">If unchecked: shorting allowed (closed-form)</span>
-          <span class="chip">Constraint: 1ᵀw = 1</span>
-        </div>
-
-        <div class="row" style="margin-top:10px; gap:8px;">
+        <div class="row" style="margin-top:10px;gap:8px;">
           <button id="btnCompute">Compute Frontier & Weights</button>
           <button id="btnDownloadGamma"  disabled>Download Gamma</button>
           <button id="btnDownloadTan"    disabled>Download Tangency</button>
@@ -113,48 +94,49 @@ Date,SPY,IEF,GLD
       <div class="card">
         <label>Efficient Frontier + CML</label>
         <canvas id="frontierChart" height="280"></canvas>
-        <div class="footer">
-          <span id="pfStats" class="muted"></span><br/>
-          <span id="tanStats" class="muted"></span>
+        <div class="muted" style="margin-top:8px;">
+          <div id="pfStats"></div>
+          <div id="tanStats"></div>
         </div>
       </div>
 
       <div class="card">
-        <label>Optimal Weights (for chosen γ)</label>
-        <div style="overflow:auto; max-height:260px;">
+        <label>Optimal Weights (γ-portfolio)</label>
+        <div style="overflow:auto;max-height:260px;">
           <table id="weightsTable">
             <thead><tr><th>Asset</th><th>Weight</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
-        <p class="muted">Long-only solves a convex QP on the simplex (w ≥ 0, 1ᵀw = 1), producing the true constrained optimum.</p>
-
+        <p class="muted">Long-only solves a convex QP on the simplex (w ≥ 0, 1ᵀw = 1). γ uses raw μ (no rf). Tangency/CML use rf.</p>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <strong>Notes & Tips</strong>
-    <ul>
-      <li><b>Data:</b> Use adjusted close prices. The app computes log returns.</li>
-      <li><b>Annualization:</b> Means & covariances scale by your selected frequency (252/52/12).</li>
+    <strong>Notes</strong>
+    <ul class="muted">
+      <li>Returns = <em>log</em> returns. Annualization: μ×freq, Σ×freq.</li>
+      <li>QP: Accelerated projected gradient with warm-starts; small diagonal jitter for numerical stability.</li>
     </ul>
   </div>
 
 <script>
-/* === Utilities === */
-const $ = sel => document.querySelector(sel);
+/* ---------- Utilities & State ---------- */
+const $ = s => document.querySelector(s);
 const statusEl = $('#status');
 let chart;
+let lastRun = { ready:false, longOnly:true, params:{} };
+let weightsGamma=null, weightsTan=null, weightsMVP=null;
 
-/* CSV -> matrix helpers */
-function parseCSVToMatrix(csv) {
-  const parsed = Papa.parse(csv.trim(), { header: true, dynamicTyping: true });
+/* ---------- CSV / math helpers ---------- */
+function parseCSVToMatrix(csv){
+  const parsed = Papa.parse(csv.trim(), { header:true, dynamicTyping:true });
   if (parsed.errors.length) throw new Error(parsed.errors[0].message);
-  const rows = parsed.data.filter(r => r && Object.values(r).some(v => v !== null && v !== ''));
+  const rows = parsed.data.filter(r => r && Object.values(r).some(v => v!==null && v!==''));
   if (!rows.length) throw new Error('No data rows found');
   const headers = parsed.meta.fields;
-  if (!headers || headers.length < 2) throw new Error('Need Date + at least one asset column');
+  if (!headers || headers.length<2) throw new Error('Need Date + at least one asset column');
   const tickers = headers.slice(1);
   const prices = rows.map(r => tickers.map(k => Number(r[k])));
   for (let i=0;i<prices.length;i++){
@@ -164,28 +146,21 @@ function parseCSVToMatrix(csv) {
   }
   return { tickers, prices };
 }
-
-function toReturns(prices, useLog=true) {
-  const T = prices.length, N = prices[0].length;
-  const R = [];
+function toReturns(prices){ // log returns
+  const T = prices.length, N = prices[0].length, R=[];
   for (let t=1;t<T;t++){
     const row = new Array(N);
-    for (let i=0;i<N;i++){
-      const r = prices[t][i] / prices[t-1][i];
-      row[i] = useLog ? Math.log(r) : (r - 1);
-    }
+    for (let i=0;i<N;i++) row[i] = Math.log(prices[t][i]/prices[t-1][i]);
     R.push(row);
   }
-  return R; // (T-1) x N
+  return R;
 }
-
-function mean(vec) { return vec.reduce((a,b)=>a+b,0)/vec.length; }
-function column(matrix, j) { return matrix.map(row => row[j]); }
-
-function covarianceMatrix(R) {
+const mean = v => v.reduce((a,b)=>a+b,0)/v.length;
+const column = (M,j) => M.map(r => r[j]);
+function covarianceMatrix(R){
   const T = R.length, N = R[0].length;
   const means = Array.from({length:N}, (_,j)=> mean(column(R,j)));
-  const S = math.zeros(N, N)._data;
+  const S = math.zeros(N,N)._data;
   for (let i=0;i<N;i++){
     for (let j=0;j<N;j++){
       let s=0;
@@ -193,336 +168,269 @@ function covarianceMatrix(R) {
       S[i][j] = s/(T-1);
     }
   }
-  return { cov: S, mean: means };
+  return { cov:S, mean:means };
 }
+function scaleAnnual(mu,S,freq){ return { muA: mu.map(m=>m*freq), sigA: math.multiply(S,freq) }; }
+function toArray1D(x){ if (Array.isArray(x)) return x.flat(); if (x && typeof x.toArray==='function') return x.toArray().flat(); return [x]; }
 
-function scaleAnnual(mu, Sigma, freq) {
-  const muA = mu.map(m => m * freq);
-  const sigA = math.multiply(Sigma, freq); // covariance scales linearly
-  return { muA, sigA };
-}
-
-function toArray1D(x) { if (Array.isArray(x)) return x.flat(); if (x && typeof x.toArray === 'function') return x.toArray().flat(); return [x]; }
-
-/* === Simplex projection (Duchi et al., 2008) === */
-function projectSimplex(v) {
-  const n = v.length;
-  const u = [...v].sort((a,b)=>b-a);
-  let css = 0, rho = -1, theta = 0;
-  for (let i=0;i<n;i++){
-    css += u[i];
-    const t = (css - 1)/(i+1);
-    if (u[i] - t > 0) { rho = i; theta = t; }
-  }
-  theta = (u.slice(0, rho+1).reduce((a,b)=>a+b,0) - 1)/(rho+1);
-  const w = v.map(vi => Math.max(vi - theta, 0));
-  // exact sum=1 guard
-  const s = w.reduce((a,b)=>a+b,0);
+/* ---------- Simplex projection (Duchi 2008) ---------- */
+function projectSimplex(v){
+  const n=v.length, u=[...v].sort((a,b)=>b-a);
+  let css=0, rho=-1, theta=0;
+  for (let i=0;i<n;i++){ css+=u[i]; const t=(css-1)/(i+1); if (u[i]-t>0){ rho=i; theta=t; } }
+  theta=(u.slice(0,rho+1).reduce((a,b)=>a+b,0)-1)/(rho+1);
+  const w=v.map(vi=>Math.max(vi-theta,0)), s=w.reduce((a,b)=>a+b,0);
   return s>0 ? w.map(x=>x/s) : w;
 }
 
-/* ============ NEW: True constrained QP on simplex (APGD) ============ */
-/* Solve: minimize 0.5 w^T H w - b^T w  s.t. w ∈ Δ = {w >= 0, 1^T w = 1} */
-function qpOnSimplex(H, b, maxIter=5000, tol=1e-8) {
-  const N = b.length;
-  // Lipschitz constant L = largest eigenvalue of H (PSD). Cheap bound via Gershgorin:
-  let L = 0;
-  for (let i=0;i<N;i++){
-    let rowSum = 0;
-    for (let j=0;j<N;j++) rowSum += Math.abs(H[i][j]);
-    L = Math.max(L, rowSum);
-  }
-  if (!isFinite(L) || L<=0) L = 1;
+/* ---------- QP on simplex (APGD, warm-start, tight tol) ---------- */
+function qpOnSimplex(H,b,maxIter=15000,tol=1e-10,w0=null){
+  const N=b.length;
+  let L=0; // Gershgorin bound
+  for (let i=0;i<N;i++){ let row=0; for (let j=0;j<N;j++) row+=Math.abs(H[i][j]); L=Math.max(L,row); }
+  if (!isFinite(L)||L<=0) L=1;
+  let y = (Array.isArray(w0)&&w0.length===N) ? projectSimplex(w0.slice()) : new Array(N).fill(1/N);
+  let w=y.slice(), t=1;
 
-  // init at uniform simplex
-  let y = new Array(N).fill(1/N);
-  let w = y.slice();
-  let t = 1;
-
-  const grad = (x) => {
-    // H x - b
-    const g = new Array(N).fill(0);
-    for (let i=0;i<N;i++){
-      let acc = 0;
-      const Hi = H[i];
-      for (let j=0;j<N;j++) acc += Hi[j]*x[j];
-      g[i] = acc - b[i];
-    }
+  const grad = x => {
+    const g=new Array(N).fill(0);
+    for (let i=0;i<N;i++){ let acc=0, Hi=H[i]; for (let j=0;j<N;j++) acc+=Hi[j]*x[j]; g[i]=acc-b[i]; }
     return g;
   };
 
-  let g = grad(y);
+  let g=grad(y), step=1/L;
   for (let k=0;k<maxIter;k++){
-    // step
-    const step = 1.0 / L; // constant step; works well for PSD H
-    const z = new Array(N);
-    for (let i=0;i<N;i++) z[i] = y[i] - step * g[i];
-    const wNext = projectSimplex(z);
-
-    // Nesterov acceleration
-    const tNext = 0.5*(1 + Math.sqrt(1 + 4*t*t));
-    const yNext = wNext.map((wi, i) => wi + ((t - 1)/tNext)*(wi - w[i]));
-
-    // check convergence by ||w_next - w||
-    let diff = 0;
-    for (let i=0;i<N;i++){ const d = wNext[i] - w[i]; diff += d*d; }
-    if (diff <= tol*tol) return wNext;
-
-    // iterate
-    w = wNext; y = yNext; t = tNext; g = grad(y);
+    const z=new Array(N);
+    for (let i=0;i<N;i++) z[i]=y[i]-step*g[i];
+    const wNext=projectSimplex(z);
+    const tNext=0.5*(1+Math.sqrt(1+4*t*t));
+    const yNext=wNext.map((wi,i)=>wi+((t-1)/tNext)*(wi-w[i]));
+    let diff=0; for (let i=0;i<N;i++){ const d=wNext[i]-w[i]; diff+=d*d; }
+    if (diff<=tol*tol) return wNext;
+    w=wNext; y=yNext; t=tNext; g=grad(y);
   }
-  return w; // last iterate
+  return w;
 }
 
-/* === Exact constrained portfolios using the QP solver === */
-// MVP: minimize 0.5 w^T Σ w
-function mvp_true(Sigma) {
-  const N = Sigma.length;
-  const b = new Array(N).fill(0);
-  return qpOnSimplex(Sigma, b);
+/* ---------- Portfolios (constrained + unconstrained) ---------- */
+function mvp_true(Sigma){ const N=Sigma.length, b=new Array(N).fill(0); return qpOnSimplex(Sigma,b); }
+// γ uses raw μ (no rf)
+function gamma_true(mu,Sigma,rf,gamma){ const H=Sigma.map(r=>r.map(v=>v*gamma)); const b=mu.slice(); return qpOnSimplex(H,b); }
+
+function portfolioStats(w,mu,Sigma){
+  const wv=math.matrix(w);
+  const ret=math.multiply(math.transpose(wv),mu);
+  const v = math.multiply(math.transpose(wv), math.multiply(Sigma,wv));
+  return { ret:Number(ret), vol:Math.sqrt(Math.max(Number(v),0)) };
 }
 
-// Gamma: maximize (μ - r_f 1)^T w - (γ/2) w^T Σ w  ⇔ minimize 0.5 (γΣ) w^T w - (μ - r_f 1)^T w
-function gamma_true(mu, Sigma, rf, gamma) {
-  const N = mu.length;
-  const one = new Array(N).fill(1);
-  const b = mu.map((m,i) => m - rf*one[i]);            // μ_excess
-  const H = Sigma.map(row => row.map(v => v * gamma)); // γΣ
-  return qpOnSimplex(H, b);
+/* Unconstrained closed-form (shorting allowed) */
+function optimalWeightsGivenGamma_unc(mu,Sigma,gamma){
+  const I=math.ones(mu.length)._data, invS=math.inv(Sigma);
+  const invS_mu=math.multiply(invS,mu), invS_1=math.multiply(invS,I);
+  const A=math.multiply(math.transpose(I),invS_1);
+  const B=math.multiply(math.transpose(I),invS_mu);
+  const term1=math.multiply(1/gamma,invS_mu);
+  const term2=math.multiply((gamma-B)/(gamma*A),invS_1);
+  return toArray1D(math.add(term1,term2));
+}
+function mvp_unc(Sigma){
+  const I=math.ones(Sigma.length)._data, invS=math.inv(Sigma), invS1=math.multiply(invS,I);
+  const A=math.multiply(math.transpose(I),invS1);
+  return toArray1D(math.divide(invS1,A));
+}
+function tangency_unc(mu,Sigma,rf){
+  const I=math.ones(mu.length)._data, invS=math.inv(Sigma);
+  const muEx=math.subtract(mu, math.multiply(rf,I));
+  const num=math.multiply(invS,muEx), den=math.multiply(math.transpose(I),num);
+  const w=toArray1D(math.divide(num,den));
+  const {ret,vol}=portfolioStats(w,mu,Sigma);
+  return { w, ret, vol, sharpe:(ret-rf)/Math.max(vol,1e-12) };
 }
 
-/* Efficient frontier via β-sweep: for each β >= 0 solve min 1/2 w^T Σ w - β μ^T w */
-function frontier_true(mu, Sigma, rf, n=120) {
-  const betas = [];
-  // Sweep β on a log-ish grid to cover conservative → aggressive
-  const betaMin = 1e-4, betaMax = 1e3;
-  for (let k=0;k<n;k++){
-    const t = k/(n-1);
-    // smooth grid (exp on [betaMin,betaMax])
-    const beta = betaMin * Math.pow(betaMax/betaMin, t);
-    betas.push(beta);
-  }
-  const pts = [];
-  const ws  = [];
+/* ---------- Tangency/Frontier (constrained) with refine ---------- */
+function dot(a,b){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
+function quad(w,S){ let v=0; for(let i=0;i<w.length;i++){ let row=0; for(let j=0;j<w.length;j++) row+=S[i][j]*w[j]; v+=w[i]*row; } return v; }
+
+function frontier_true(mu,Sigma,rf,n=120){
+  const stats = w => { const r=dot(w,mu); const s=Math.sqrt(Math.max(quad(w,Sigma),0)); return {r,s,sh:(r-rf)/Math.max(s,1e-12)}; };
+
+  // coarse beta grid
+  const betaMin=1e-4, betaMax=1e3, betas=[];
+  for (let k=0;k<n;k++){ const t=k/(n-1); betas.push(betaMin*Math.pow(betaMax/betaMin,t)); }
+
+  const pts=[]; let best={sh:-Infinity,beta:null,w:null}, wWarm=null;
   for (const beta of betas){
-    const b = mu.map(m => beta*m);
-    const w = qpOnSimplex(Sigma, b, 4000, 1e-8);
-    const ret = Number(math.multiply(math.transpose(w), mu));
-    const var_ = Number(math.multiply(math.transpose(w), math.multiply(Sigma, w)));
-    pts.push({ r: ret, s: Math.sqrt(Math.max(var_,0)), w });
-    ws.push(w);
+    const b=mu.map(m=>beta*m);
+    const w=qpOnSimplex(Sigma,b,8000,1e-9,wWarm); wWarm=w;
+    const s=stats(w); pts.push({ r:s.r, s:s.s, w });
+    if (s.sh>best.sh) best={ sh:s.sh, beta, w };
   }
-  // Pick tangency as frontier point with max Sharpe
-  let bestIdx = 0, bestSharpe = -1e99;
-  for (let i=0;i<pts.length;i++){
-    const sh = (pts[i].r - rf) / Math.max(pts[i].s, 1e-12);
-    if (sh > bestSharpe){ bestSharpe = sh; bestIdx = i; }
+
+  // golden-section refine around best beta (continuous search)
+  const phi=(Math.sqrt(5)-1)/2, span=2; // +/- two log units
+  let lo=Math.max(Math.log(betaMin), Math.log(best.beta)-span);
+  let hi=Math.min(Math.log(betaMax), Math.log(best.beta)+span);
+  const evalSharpe = (lx,w0)=>{ const b=mu.map(m=>Math.exp(lx)*m); const w=qpOnSimplex(Sigma,b,12000,1e-10,w0); const s=stats(w); return { ...s, w, lx }; };
+
+  let x1=hi - phi*(hi-lo), x2=lo + phi*(hi-lo);
+  let f1=evalSharpe(x1,best.w), f2=evalSharpe(x2,best.w);
+  for (let it=0; it<40; it++){
+    if (f1.sh < f2.sh){ lo=x1; x1=x2; f1=f2; x2=lo + phi*(hi-lo); f2=evalSharpe(x2,f2.w); }
+    else { hi=x2; x2=x1; f2=f1; x1=hi - phi*(hi-lo); f1=evalSharpe(x1,f1.w); }
   }
-  const tan = pts[bestIdx];
-  return { pts, tan };
+  const tan = (f1.sh>f2.sh)? f1 : f2;
+  return { pts, tan:{ w:tan.w, r:tan.r, s:tan.s, sh:tan.sh } };
 }
 
-/* Stats */
-function portfolioStats(w, mu, Sigma) {
-  const wv = math.matrix(w);
-  const ret = math.multiply(math.transpose(wv), mu);
-  const var_ = math.multiply(math.transpose(wv), math.multiply(Sigma, wv));
-  return { ret: Number(ret), vol: Math.sqrt(Math.max(Number(var_), 0)) };
-}
+/* ---------- UI: compute ---------- */
+$('#longOnly').addEventListener('change', ()=>{
+  lastRun.ready=false;
+  $('#btnDownloadGamma').disabled = true;
+  $('#btnDownloadTan').disabled   = true;
+  $('#btnDownloadMVP').disabled   = true;
+  statusEl.textContent='Long-only changed — click “Compute Frontier & Weights”.';
+});
 
-/* === Unconstrained formulas (kept for "shorting allowed") === */
-function optimalWeightsGivenGamma_unc(muExcess, Sigma, gamma) {
-  const I = math.ones(muExcess.length)._data;
-  const invS = math.inv(Sigma);
-  const invS_mu = math.multiply(invS, muExcess);
-  const invS_1  = math.multiply(invS, I);
-  const A = math.multiply(math.transpose(I), invS_1);
-  const B = math.multiply(math.transpose(I), invS_mu);
-  const term1 = math.multiply(1/gamma, invS_mu);
-  const term2 = math.multiply((gamma - B)/(gamma * A), invS_1);
-  return toArray1D(math.add(term1, term2));
-}
-function mvp_unc(Sigma) {
-  const I = math.ones(Sigma.length)._data;
-  const invS = math.inv(Sigma);
-  const invS1 = math.multiply(invS, I);
-  const A = math.multiply(math.transpose(I), invS1);
-  return toArray1D(math.divide(invS1, A));
-}
-function tangency_unc(mu, Sigma, rf) {
-  const I = math.ones(mu.length)._data;
-  const invS = math.inv(Sigma);
-  const muEx = math.subtract(mu, math.multiply(rf, I));
-  const num  = math.multiply(invS, muEx);
-  const den  = math.multiply(math.transpose(I), num);
-  const wT   = toArray1D(math.divide(num, den));
-  const { ret, vol } = portfolioStats(wT, mu, Sigma);
-  const sharpe = (ret - rf) / Math.max(vol, 1e-12);
-  return { wT, ret, vol, sharpe };
-}
-
-/* === UI wiring === */
-let weightsGamma = null, weightsTan = null, weightsMVP = null;
-
-$('#btnCompute').addEventListener('click', async () => {
-  try {
-    statusEl.textContent = 'Parsing & computing…';
-    const file = $('#fileInput').files[0];
-    if (!file) throw new Error('Please choose a CSV file.');
+$('#btnCompute').addEventListener('click', async ()=>{
+  try{
+    statusEl.textContent='Parsing & computing…';
+    const file = $('#fileInput').files[0]; if(!file) throw new Error('Please choose a CSV file.');
     const text = await file.text();
 
     const freq = Number($('#freq').value);
-    const rf = Number($('#rf').value) || 0;
-    const gamma = Number($('#gamma').value);
+    const rf   = Number($('#rf').value) || 0;
+    const gamma= Number($('#gamma').value);
     const nFrontier = Math.max(40, Number($('#nFrontier').value));
     const longOnly = $('#longOnly').checked;
 
     const { tickers, prices } = parseCSVToMatrix(text);
     if (prices.length < 3) throw new Error('Need at least 3 rows of prices.');
-    const R = toReturns(prices, true); // log returns
-    const { cov, mean: m } = covarianceMatrix(R);
+    const R = toReturns(prices);
+    const { cov, mean:m } = covarianceMatrix(R);
     const { muA, sigA } = scaleAnnual(m, cov, freq);
 
+    // tiny jitter for stability
+    for (let i=0;i<sigA.length;i++) sigA[i][i] += 1e-12;
+
     let wG, wM, tan, front;
-    if (longOnly) {
-      // === TRUE constrained (Goal B) ===
-      wG = gamma_true(muA, sigA, rf, gamma);
+    if (longOnly){
+      wG = gamma_true(muA, sigA, rf, gamma); // γ uses raw μ
       wM = mvp_true(sigA);
-      const { pts, tan: tanPt } = frontier_true(muA, sigA, rf, nFrontier);
+      const { pts, tan:tanPt } = frontier_true(muA, sigA, rf, nFrontier);
       front = pts;
-      tan = { wT: tanPt.w, ret: tanPt.r, vol: tanPt.s, sharpe: (tanPt.r - rf)/Math.max(tanPt.s,1e-12) };
+      tan = { w: tanPt.w, ret: tanPt.r, vol: tanPt.s, sharpe: tanPt.sh };
     } else {
-      // === Unconstrained (closed-form) ===
-      const muExcess = muA.map(u => u - rf);
-      wG = optimalWeightsGivenGamma_unc(muExcess, sigA, gamma);
+      wG = optimalWeightsGivenGamma_unc(muA, sigA, gamma);
       wM = mvp_unc(sigA);
       const t = tangency_unc(muA, sigA, rf);
-      tan = t;
+      tan = { w: t.w, ret: t.ret, vol: t.vol, sharpe: t.sharpe };
 
-      // Make a visual frontier by the analytic sweep (unconstrained)
-      const pts = [];
-      const N = muA.length;
-      const I = math.ones(N)._data, invS = math.inv(sigA);
-      const A = math.multiply(math.transpose(I), math.multiply(invS, I));
-      const B = math.multiply(math.transpose(I), math.multiply(invS, muA));
-      const C = math.multiply(math.transpose(muA), math.multiply(invS, muA));
-      const D = A*C - B*B;
-      const mu_mvp = B/A;
-      let rLo = Math.min(mu_mvp, Math.min(...muA));
-      let rHi = Math.max(Math.max(...muA), tan.ret);
-      const spanUp = Math.max(rHi - mu_mvp, 1e-6);
-      const spanDn = Math.max(mu_mvp - rLo, 1e-6);
-      rHi = rHi + 0.35*spanUp; rLo = rLo - 0.35*spanDn;
+      // analytic sweep for unconstrained frontier (visual)
+      const N=muA.length, I=math.ones(N)._data, invS=math.inv(sigA);
+      const A=math.multiply(math.transpose(I), math.multiply(invS,I));
+      const B=math.multiply(math.transpose(I), math.multiply(invS,muA));
+      const C=math.multiply(math.transpose(muA), math.multiply(invS,muA));
+      const D=A*C - B*B;
+      const mu_mvp=B/A;
+      let rLo=Math.min(mu_mvp, Math.min(...muA));
+      let rHi=Math.max(Math.max(...muA), tan.ret);
+      const spanUp=Math.max(rHi-mu_mvp,1e-6), spanDn=Math.max(mu_mvp-rLo,1e-6);
+      rHi=rHi + 0.35*spanUp; rLo=rLo - 0.35*spanDn;
+      const pts=[];
       for (let k=0;k<nFrontier;k++){
-        const r = rLo + (rHi - rLo)*k/(nFrontier-1);
-        const alpha = (C - B*r)/D;
-        const beta  = (A*r - B)/D;
-        let w = math.multiply(invS, math.add(math.multiply(alpha, I), math.multiply(beta, muA)));
+        const r=rLo + (rHi-rLo)*k/(nFrontier-1);
+        const alpha=(C - B*r)/D, beta=(A*r - B)/D;
+        let w = math.multiply(invS, math.add(math.multiply(alpha,I), math.multiply(beta,muA)));
         w = toArray1D(w);
-        const var_ = math.multiply(math.transpose(w), math.multiply(sigA, w));
-        const ret  = math.multiply(math.transpose(w), muA);
-        pts.push({ r: Number(ret), s: Math.sqrt(Math.max(Number(var_),0)), w });
+        const var_=math.multiply(math.transpose(w), math.multiply(sigA,w));
+        const ret=math.multiply(math.transpose(w), muA);
+        pts.push({ r:Number(ret), s:Math.sqrt(Math.max(Number(var_),0)), w });
       }
-      front = pts;
+      front=pts;
     }
 
     const statsG = portfolioStats(wG, muA, sigA);
 
-    // === CML (visual) ===
-    const maxSigma = Math.max(tan.vol, statsG.vol, ...front.map(p => p.s)) * 1.05;
-    const cmlPts = (function(){
-      const slope = (tan.ret - rf) / Math.max(tan.vol, 1e-12);
-      const pts = [];
-      for (let i=0;i<100;i++){
-        const x = (maxSigma * i)/(100-1);
-        pts.push({ x, y: rf + slope * x });
-      }
-      return pts;
-    })();
+    // CML (visual)
+    const maxSigma = Math.max(tan.vol, statsG.vol, ...front.map(p=>p.s)) * 1.05;
+    const cmlPts = (()=>{ const slope=(tan.ret - rf)/Math.max(tan.vol,1e-12); const pts=[]; for(let i=0;i<100;i++){ const x=(maxSigma*i)/(99); pts.push({x, y: rf + slope*x}); } return pts; })();
 
-    // Save for downloads
-    weightsGamma = tickers.map((t,i) => ({ Asset: t, Weight: wG[i] }));
-    weightsTan   = tickers.map((t,i) => ({ Asset: t, Weight: tan.wT[i] }));
-    weightsMVP   = tickers.map((t,i) => ({ Asset: t, Weight: wM[i] }));
+    // Save for downloads (current run only)
+    weightsGamma = tickers.map((t,i)=>({ Asset:t, Weight:Number(wG[i]) }));
+    weightsTan   = tickers.map((t,i)=>({ Asset:t, Weight:Number(tan.w[i]) }));
+    weightsMVP   = tickers.map((t,i)=>({ Asset:t, Weight:Number(wM[i]) }));
 
-    document.getElementById('btnDownloadGamma').disabled = false;
-    document.getElementById('btnDownloadTan').disabled   = false;
-    document.getElementById('btnDownloadMVP').disabled   = false;
+    // enable downloads
+    $('#btnDownloadGamma').disabled = false;
+    $('#btnDownloadTan').disabled   = false;
+    $('#btnDownloadMVP').disabled   = false;
 
-    // Table: γ-weights
-    const tbody = $('#weightsTable tbody');
-    tbody.innerHTML = '';
+    lastRun = { ready:true, longOnly, params:{ rf, gamma, freq, nFrontier } };
+
+    // table (γ weights)
+    const tbody = $('#weightsTable tbody'); tbody.innerHTML='';
     for (let i=0;i<tickers.length;i++){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${tickers[i]}</td><td>${(wG[i]*100).toFixed(2)}%</td>`;
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${tickers[i]}</td><td>${(wG[i]*100).toFixed(2)}%</td>`;
       tbody.appendChild(tr);
     }
 
-    // Stats text
-    $('#pfStats').textContent =
-      `Optimal (γ=${gamma}${longOnly? ", long-only (QP)":""}):  E[μ]=${(statsG.ret*100).toFixed(2)}%  |  σ=${(statsG.vol*100).toFixed(2)}%  |  Sharpe≈${((statsG.ret - rf)/Math.max(statsG.vol,1e-9)).toFixed(2)}`;
-    $('#tanStats').textContent =
-      `Tangency${longOnly? " (true constrained)":""}:  E[μ]=${(tan.ret*100).toFixed(2)}%  |  σ=${(tan.vol*100).toFixed(2)}%  |  Sharpe=${tan.sharpe.toFixed(2)}  |  rf=${(rf*100).toFixed(2)}%`;
+    // stats text
+    $('#pfStats').textContent = `γ=${gamma}${longOnly?', long-only (QP)':''}  |  E[μ]=${(statsG.ret*100).toFixed(2)}%  |  σ=${(statsG.vol*100).toFixed(2)}%  |  Sharpe≈${((statsG.ret-rf)/Math.max(statsG.vol,1e-9)).toFixed(2)}`;
+    $('#tanStats').textContent= `Tangency  |  E[μ]=${(tan.ret*100).toFixed(2)}%  |  σ=${(tan.vol*100).toFixed(2)}%  |  Sharpe=${tan.sharpe.toFixed(2)}  |  rf=${(rf*100).toFixed(2)}%`;
 
-    // Plot
+    // plot
     const data = {
       labels: front.map(_=> ''),
       datasets: [
-        { label: 'Efficient Frontier', data: front.map(p => ({ x: p.s, y: p.r })), showLine: true, pointRadius: 2 },
-        { label: 'CML (through Tangency)', data: cmlPts, showLine: true, pointRadius: 0, borderDash: [6,4] },
-        { label: 'Tangency Portfolio', data: [{ x: tan.vol, y: tan.ret }], pointRadius: 6 },
-        { label: 'Your Portfolio (γ)', data: [{ x: statsG.vol, y: statsG.ret }], pointRadius: 6 }
+        { label:'Efficient Frontier', data: front.map(p=>({x:p.s,y:p.r})), showLine:true, pointRadius:2 },
+        { label:'CML (through Tangency)', data: cmlPts, showLine:true, pointRadius:0, borderDash:[6,4] },
+        { label:'Tangency Portfolio', data: [{x:tan.vol,y:tan.ret}], pointRadius:6 },
+        { label:'Your Portfolio (γ)', data: [{x:statsG.vol,y:statsG.ret}], pointRadius:6 }
       ]
     };
     const ctx = document.getElementById('frontierChart');
     if (chart) chart.destroy();
     chart = new Chart(ctx, {
-      type: 'scatter',
+      type:'scatter',
       data,
-      options: {
-        animation: false,
-        responsive: true,
-        plugins: {
-          legend: { position: 'top' },
-          tooltip: {
-            callbacks: {
-              label: function(ctx){
-                const x = ctx.raw.x, y = ctx.raw.y;
-                return `σ=${(x*100).toFixed(2)}%, μ=${(y*100).toFixed(2)}%`;
-              }
-            }
-          }
+      options:{
+        animation:false,responsive:true,
+        plugins:{ legend:{position:'top'},
+          tooltip:{ callbacks:{ label:(c)=>`σ=${(c.raw.x*100).toFixed(2)}%, μ=${(c.raw.y*100).toFixed(2)}%` } }
         },
-        scales: {
-          x: { title: { display: true, text: 'Volatility (σ, annualized)' } },
-          y: { title: { display: true, text: 'Expected Return (μ, annualized)' } }
-        }
+        scales:{ x:{ title:{display:true,text:'Volatility (σ, annualized)'} }, y:{ title:{display:true,text:'Expected Return (μ, annualized)'} } }
       }
     });
 
     statusEl.innerHTML = `<span class="success">Done.</span> Loaded ${prices.length} rows × ${tickers.length} assets.`;
-  } catch (e) {
+  } catch(e){
     statusEl.innerHTML = `<span class="warn">Error:</span> ${e.message}`;
     console.error(e);
   }
 });
 
-/* CSV download helper */
-function downloadCSV(rows, filename) {
-  const header = 'Asset,Weight';
-  const body   = rows.map(r => `${r.Asset},${r.Weight}`);
-  const blob   = new Blob([[header, ...body].join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url    = URL.createObjectURL(blob);
-  const a      = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+/* ---------- Downloads ---------- */
+function downloadCSV(rows, filename){
+  if (!lastRun.ready){ alert('Run “Compute Frontier & Weights” first.'); return; }
+  const meta = [
+    '# mode=' + (lastRun.longOnly ? 'long-only(QP)' : 'unconstrained'),
+    '# rf=' + lastRun.params.rf,
+    '# gamma=' + lastRun.params.gamma,
+    '# freq=' + lastRun.params.freq,
+    '# nFrontier=' + lastRun.params.nFrontier
+  ].join('\n');
+  const header='Asset,Weight';
+  const body = rows.map(r=>`${r.Asset},${r.Weight}`);
+  const blob = new Blob([[meta, header, ...body].join('\n')], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.style.display='none'; a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
-
-/* Download buttons */
-document.getElementById('btnDownloadGamma').addEventListener('click', () => { if (weightsGamma) downloadCSV(weightsGamma, 'weights_gamma.csv'); });
-document.getElementById('btnDownloadTan').addEventListener('click',   () => { if (weightsTan)   downloadCSV(weightsTan,   'weights_tangency.csv'); });
-document.getElementById('btnDownloadMVP').addEventListener('click',   () => { if (weightsMVP)   downloadCSV(weightsMVP,   'weights_mvp.csv'); });
+$('#btnDownloadGamma').addEventListener('click', ()=>{ if (weightsGamma) downloadCSV(weightsGamma, 'weights_gamma.csv'); });
+$('#btnDownloadTan').addEventListener('click',   ()=>{ if (weightsTan)   downloadCSV(weightsTan,   'weights_tangency.csv'); });
+$('#btnDownloadMVP').addEventListener('click',   ()=>{ if (weightsMVP)   downloadCSV(weightsMVP,   'weights_mvp.csv'); });
 </script>
-
 </body>
 </html>
