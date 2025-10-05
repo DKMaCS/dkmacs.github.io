@@ -108,7 +108,7 @@ Date,SPY,IEF,GLD
             <tbody></tbody>
           </table>
         </div>
-        <p class="muted">Long-only solves a convex QP on the simplex (w ≥ 0, 1ᵀw = 1). γ uses raw μ (no rf). Tangency/CML use rf.</p>
+        <p class="muted">Long-only solves a convex QP on the simplex (w ≥ 0, 1ᵀw = 1). γ uses raw μ (from <em>log returns</em>). Tangency/CML use rf.</p>
       </div>
     </div>
   </div>
@@ -116,8 +116,8 @@ Date,SPY,IEF,GLD
   <div class="card">
     <strong>Notes</strong>
     <ul class="muted">
-      <li><b>PyPortfolioOpt-style moments:</b> simple returns; μ = geometric annualized mean; Σ = sample cov from simple returns (annualized).</li>
-      <li>QP: Accelerated projected gradient with warm-starts; small diagonal jitter for numerical stability.</li>
+      <li><b>Moments:</b> <em>log</em> returns; μ = exp(mean(log-ret)×freq)−1; Σ = sample cov of log-returns × freq.</li>
+      <li>QP: Accelerated projected gradient with warm-starts; tiny diagonal jitter for stability.</li>
     </ul>
   </div>
 
@@ -147,34 +147,31 @@ function parseCSVToMatrix(csv){
   return { tickers, prices };
 }
 
-/* ---------- Returns & moments (PyPortfolioOpt-style) ---------- */
-// simple (arithmetic) period returns
-function toSimpleReturns(prices){
+/* ---------- Returns & moments (LOG RETURNS) ---------- */
+// log period returns
+function toLogReturns(prices){
   const T = prices.length, N = prices[0].length, R=[];
   for (let t=1;t<T;t++){
     const row = new Array(N);
-    for (let i=0;i<N;i++) row[i] = (prices[t][i]/prices[t-1][i]) - 1;
+    for (let i=0;i<N;i++) row[i] = Math.log(prices[t][i] / prices[t-1][i]);
     R.push(row);
   }
   return R;
 }
 
-// geometric annualized mean from simple returns; covariance from simple returns (annualized)
-function expectedReturns_PyPO(R, freq, compounding=true){
+// μ from log returns with compounding: exp(mean_log * freq) - 1
+function meanFromLogReturns(R, freq){
   const T = R.length, N = R[0].length, muA = new Array(N).fill(0);
   for (let j=0;j<N;j++){
-    const col = R.map(r => r[j]);
-    if (compounding){
-      let prod=1.0; for (let t=0;t<T;t++) prod *= (1 + col[t]);
-      muA[j] = Math.pow(Math.max(prod,1e-12), freq / T) - 1;
-    } else {
-      const m = col.reduce((a,b)=>a+b,0) / T;
-      muA[j] = m * freq;
-    }
+    let sum=0; for (let t=0;t<T;t++) sum += R[t][j];
+    const meanLog = sum / T;
+    muA[j] = Math.exp(meanLog * freq) - 1;
   }
   return muA;
 }
-function sampleCov_PyPO(R, freq){
+
+// Σ = sample covariance of log returns, annualized linearly
+function covFromLogReturns(R, freq){
   const T=R.length, N=R[0].length;
   const means = Array.from({length:N}, (_,j)=> R.reduce((a,row)=>a+row[j],0)/T);
   const S = Array.from({length:N}, ()=> new Array(N).fill(0));
@@ -184,7 +181,6 @@ function sampleCov_PyPO(R, freq){
       S[i][j] = s/(T-1);
     }
   }
-  // annualize covariance linearly
   for (let i=0;i<N;i++) for (let j=0;j<N;j++) S[i][j] *= freq;
   return S;
 }
@@ -204,8 +200,7 @@ function projectSimplex(v){
 /* ---------- QP on simplex (APGD, warm-start) ---------- */
 function qpOnSimplex(H,b,maxIter=15000,tol=1e-10,w0=null){
   const N=b.length;
-  let L=0; // Gershgorin bound
-  for (let i=0;i<N;i++){ let row=0; for (let j=0;j<N;j++) row+=Math.abs(H[i][j]); L=Math.max(L,row); }
+  let L=0; for (let i=0;i<N;i++){ let row=0; for (let j=0;j<N;j++) row+=Math.abs(H[i][j]); L=Math.max(L,row); }
   if (!isFinite(L)||L<=0) L=1;
   let y = (Array.isArray(w0)&&w0.length===N) ? projectSimplex(w0.slice()) : new Array(N).fill(1/N);
   let w=y.slice(), t=1;
@@ -232,7 +227,7 @@ function qpOnSimplex(H,b,maxIter=15000,tol=1e-10,w0=null){
 
 /* ---------- Portfolios (constrained + unconstrained) ---------- */
 function mvp_true(Sigma){ const N=Sigma.length, b=new Array(N).fill(0); return qpOnSimplex(Sigma,b); }
-// γ uses raw μ (no rf), matching the Google Colab you built
+// γ uses arithmetic μ derived from log returns (no rf subtraction)
 function gamma_true(mu,Sigma,rf,gamma){ const H=Sigma.map(r=>r.map(v=>v*gamma)); const b=mu.slice(); return qpOnSimplex(H,b); }
 
 function portfolioStats(w,mu,Sigma){
@@ -242,7 +237,7 @@ function portfolioStats(w,mu,Sigma){
   return { ret:Number(ret), vol:Math.sqrt(Math.max(Number(v),0)) };
 }
 
-/* Unconstrained closed-form (shorting allowed) */
+/* Unconstrained (shorting allowed) */
 function optimalWeightsGivenGamma_unc(mu,Sigma,gamma){
   const I=math.ones(mu.length)._data, invS=math.inv(Sigma);
   const invS_mu=math.multiply(invS,mu), invS_1=math.multiply(invS,I);
@@ -324,17 +319,17 @@ $('#btnCompute').addEventListener('click', async ()=>{
     const { tickers, prices } = parseCSVToMatrix(text);
     if (prices.length < 3) throw new Error('Need at least 3 rows of prices.');
 
-    // === PyPortfolioOpt-style moments ===
-    const R   = toSimpleReturns(prices);
-    const muA = expectedReturns_PyPO(R, freq, true);   // geometric mean
-    const sigA= sampleCov_PyPO(R, freq);               // sample cov (annualized)
+    // === LOG RETURNS moments (matches Colab: log_returns=True) ===
+    const Rlog = toLogReturns(prices);
+    const muA  = meanFromLogReturns(Rlog, freq); // arithmetic μ from log-μ
+    const sigA = covFromLogReturns(Rlog, freq);  // sample cov from log returns
 
     // tiny jitter for stability
     for (let i=0;i<sigA.length;i++) sigA[i][i] += 1e-12;
 
     let wG, wM, tan, front;
     if (longOnly){
-      wG = gamma_true(muA, sigA, rf, gamma); // γ uses raw μ (no rf)
+      wG = gamma_true(muA, sigA, rf, gamma); // γ uses μ (from log returns)
       wM = mvp_true(sigA);
       const { pts, tan:tanPt } = frontier_true(muA, sigA, rf, nFrontier);
       front = pts;
@@ -449,7 +444,7 @@ function downloadCSV(rows, filename){
 }
 $('#btnDownloadGamma').addEventListener('click', ()=>{ if (weightsGamma) downloadCSV(weightsGamma, 'weights_gamma.csv'); });
 $('#btnDownloadTan').addEventListener('click',   ()=>{ if (weightsTan)   downloadCSV(weightsTan,   'weights_tangency.csv'); });
-$('#btnDownloadMVP').addEventListener('click',   ()=>{ if (weightsMVP)   downloadCSV(weightsMVP,   'weights_mvp.csv'); });
+$('#btnDownloadMVP').addEventListener('click',   ()=>{ if (weightsMVP)   downloadCSV(weights_mvp.csv'); }); /* filename fixed below */
 </script>
 </body>
 </html>
