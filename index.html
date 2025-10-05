@@ -653,7 +653,7 @@
     }));
     search.addEventListener('input', update);
 
-    //   Copy email    --
+    //   Copy email
     const copyBtn = document.getElementById('copyEmail');
     copyBtn?.addEventListener('click', async ()=>{
       const email = copyBtn.dataset.email;
@@ -666,7 +666,7 @@
       }
     });
 
-    //   Year    --------
+    //   Year
     document.getElementById('year').textContent = new Date().getFullYear();
 
     //   Smooth-scroll nav WITHOUT changing the URL hash
