@@ -31,6 +31,7 @@
     button { padding: 8px; border-radius: 8px; border: 1px solid #bbb; cursor: pointer; }
     .card .row button { width: auto; flex: 1 1 0; min-width: 140px; }
     textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; overflow: auto; }
+    .toggle { display:flex; gap:8px; align-items:center; margin-top:8px; }
   </style>
 
   <!-- Libraries -->
@@ -40,7 +41,7 @@
 </head>
 <body>
   <h1>Mean–Variance Optimizer</h1>
-  <p class="muted">Upload a CSV of prices, pick settings, and get the efficient frontier, the Capital Market Line (CML), the tangency portfolio, and optimal weights for your chosen risk-aversion (γ). Nothing leaves your browser.</p>
+  <p class="muted">Upload a CSV of prices, pick settings, and get the efficient frontier, CML, tangency, and γ-portfolio. Nothing leaves your browser.</p>
 
   <div class="row">
     <div class="col">
@@ -81,8 +82,13 @@ Date,SPY,IEF,GLD
           </div>
         </div>
 
+        <div class="toggle">
+          <input id="longOnly" type="checkbox"/>
+          <label for="longOnly">Long-only (no shorting)</label>
+        </div>
+
         <div class="chips" style="margin-top:10px;">
-          <span class="chip">Shorting allowed (exact closed-form)</span>
+          <span class="chip">If unchecked: shorting allowed (closed-form)</span>
           <span class="chip">Constraint: 1ᵀw = 1</span>
         </div>
 
@@ -114,7 +120,7 @@ Date,SPY,IEF,GLD
             <tbody></tbody>
           </table>
         </div>
-        <p class="muted">Models: MVO (shorting allowed). Tangency portfolio uses Σ⁻¹(μ−r_f·1) normalized to sum to 1. CML runs from (σ=0, μ=r_f) to the tangency point.</p>
+        <p class="muted">Long-only uses simplex projection (w ≥ 0, 1ᵀw=1). Exact long-only MVO requires a QP solver.</p>
       </div>
     </div>
   </div>
@@ -124,7 +130,6 @@ Date,SPY,IEF,GLD
     <ul>
       <li><b>Data:</b> Use adjusted close prices. The app computes log returns.</li>
       <li><b>Annualization:</b> Means & covariances scale by your selected frequency (252/52/12).</li>
-      <li><b>Long-only?</b> This version is exact for <em>shorting allowed</em>. For non-negative weights you’ll need a QP step.</li>
     </ul>
   </div>
 
@@ -133,9 +138,6 @@ Date,SPY,IEF,GLD
 const $ = sel => document.querySelector(sel);
 const statusEl = $('#status');
 let chart;
-
-/* Optional: cap γ-portfolio gross leverage (sum |w|). Set to a number like 3.0; leave null to disable. */
-const GROSS_LEV_CAP = null; // e.g., 3.0 to limit extreme long/short visuals
 
 /* CSV -> matrix helpers */
 function parseCSVToMatrix(csv) {
@@ -201,28 +203,46 @@ function toArray1D(x) {
   if (x && typeof x.toArray === 'function') return x.toArray().flat();
   return [x];
 }
-function sumAbs(v){ return v.reduce((a,b)=>a+Math.abs(b),0); }
-function scaleToGross(w, cap){
-  const g = sumAbs(w);
-  return g > cap ? w.map(x => x * (cap / g)) : w;
+
+/* === Simplex projection: project v onto {w: w>=0, sum(w)=1} (Duchi et al. 2008) === */
+function projectSimplex(v) {
+  const n = v.length;
+  const u = [...v].sort((a,b)=>b-a);
+  let css = 0, rho = -1, theta = 0;
+  for (let i=0;i<n;i++){
+    css += u[i];
+    const t = (css - 1)/(i+1);
+    if (u[i] - t > 0) { rho = i; theta = t; }
+  }
+  theta = (u.slice(0, rho+1).reduce((a,b)=>a+b,0) - 1)/(rho+1);
+  const w = v.map(vi => Math.max(vi - theta, 0));
+  return w;
 }
 
-/* === MVO Closed-Form (shorting allowed, 1ᵀw=1) === */
-function optimalWeightsGivenGamma(mu, Sigma, gamma) {
-  const N = mu.length;
+/* Optionally: project AND renormalize (defensive) */
+function enforceLongOnly(w){
+  const p = projectSimplex(w);
+  // numerical guard to ensure exact sum=1
+  const s = p.reduce((a,b)=>a+b,0);
+  return s>0 ? p.map(x => x/s) : p;
+}
+
+/* === Closed-form weights (shorting allowed, 1ᵀw=1) === */
+function optimalWeightsGivenGamma(muExcess, Sigma, gamma) {
+  const N = muExcess.length;
   const I = math.ones(N)._data;
   const invS = math.inv(Sigma);
-  const invS_mu = math.multiply(invS, mu);
+  const invS_mu = math.multiply(invS, muExcess);
   const invS_1  = math.multiply(invS, I);
   const A = math.multiply(math.transpose(I), invS_1);
   const B = math.multiply(math.transpose(I), invS_mu);
   const term1 = math.multiply(1/gamma, invS_mu);
   const term2 = math.multiply((gamma - B)/(gamma * A), invS_1);
   const w = math.add(term1, term2);
-  return toArray1D(w).map(x => Math.abs(x) < 1e-12 ? 0 : x);
+  return toArray1D(w);
 }
 
-/* MVP weights: w = Σ^{-1}1 / (1ᵀΣ^{-1}1) */
+/* MVP (unconstrained) then projected if long-only is set */
 function mvpWeights(Sigma) {
   const N = Sigma.length;
   const I = math.ones(N)._data;
@@ -233,12 +253,9 @@ function mvpWeights(Sigma) {
   return toArray1D(w);
 }
 
-/* Efficient Frontier with smarter μ-range
-   Ensures the target-return range covers MVP → max(Tangency μ, Gamma μ) with margin,
-   so the frontier “tail” is visible and your γ-point lies on/near the curve.
-*/
+/* Efficient Frontier (unconstrained) then optionally projected */
 function efficientFrontier(mu, Sigma, nPoints=120, opts={}) {
-  const { includeMu = [], margin = 0.30 } = opts; // includeMu: [mu_gamma, mu_tan] etc.
+  const { includeMu = [], margin = 0.35, longOnly = false } = opts;
   const N = mu.length;
   const I = math.ones(N)._data;
   const invS = math.inv(Sigma);
@@ -251,11 +268,8 @@ function efficientFrontier(mu, Sigma, nPoints=120, opts={}) {
   const mu_mvp = B / A;
   const rawMin = Math.min(...mu);
   const rawMax = Math.max(...mu);
-
   let rLo = Math.min(mu_mvp, rawMin);
   let rHi = Math.max(rawMax, ...includeMu);
-
-  // Expand both ends so the curve isn't visually truncated
   const spanUp = Math.max(rHi - mu_mvp, 1e-6);
   const spanDn = Math.max(mu_mvp - rLo, 1e-6);
   rHi = rHi + margin * spanUp;
@@ -266,9 +280,12 @@ function efficientFrontier(mu, Sigma, nPoints=120, opts={}) {
     const r = rLo + (rHi - rLo)*k/(nPoints-1);
     const alpha = (C - B*r)/D;
     const beta  = (A*r - B)/D;
-    const w = math.multiply(invS, math.add(math.multiply(alpha, I), math.multiply(beta, mu)));
-    const var_ = (A*r*r - 2*B*r + C)/D;
-    pts.push({ r, s: Math.sqrt(Math.max(var_, 0)), w: toArray1D(w) });
+    let w = math.multiply(invS, math.add(math.multiply(alpha, I), math.multiply(beta, mu)));
+    w = toArray1D(w);
+    if (longOnly) w = enforceLongOnly(w);
+    const var_ = math.multiply(math.transpose(w), math.multiply(Sigma, w));
+    const ret  = math.multiply(math.transpose(w), mu);
+    pts.push({ r: Number(ret), s: Math.sqrt(Math.max(Number(var_), 0)), w });
   }
   return pts;
 }
@@ -281,27 +298,28 @@ function portfolioStats(w, mu, Sigma) {
   return { ret: Number(ret), vol: Math.sqrt(Math.max(Number(var_), 0)) };
 }
 
-/* Tangency (max Sharpe), sum-to-1 */
-function tangencyPortfolio(mu, Sigma, rf) {
+/* Tangency (max Sharpe), then optionally projected */
+function tangencyPortfolio(mu, Sigma, rf, longOnly=false) {
   const N = mu.length;
   const I = math.ones(N)._data;
   const invS = math.inv(Sigma);
   const muEx = math.subtract(mu, math.multiply(rf, I));        // μ - r_f 1
-  const num  = math.multiply(invS, muEx);                       // Σ^{-1}(μ - r_f 1)
-  const den  = math.multiply(math.transpose(I), num);           // 1ᵀΣ^{-1}(μ - r_f 1)
-  const wT   = math.divide(num, den);                           // normalize to sum to 1
-  const wTa  = toArray1D(wT);
-  const { ret, vol } = portfolioStats(wTa, mu, Sigma);
+  let num  = math.multiply(invS, muEx);                         // Σ^{-1}(μ - r_f 1)
+  let den  = math.multiply(math.transpose(I), num);             // 1ᵀΣ^{-1}(μ - r_f 1)
+  let wT   = toArray1D(math.divide(num, den));                  // sum to 1 (unconstrained)
+  if (longOnly) wT = enforceLongOnly(wT);                       // project to long-only
+  const { ret, vol } = portfolioStats(wT, mu, Sigma);
   const sharpe = (ret - rf) / Math.max(vol, 1e-12);
-  return { wT: wTa, ret, vol, sharpe };
+  return { wT, ret, vol, sharpe };
 }
 
-function makeCMLPoints(rf, tanVol, tanRet, xMax, n=80) {
+/* CML points (visual) */
+function makeCMLPoints(rf, tanVol, tanRet, xMax, n=100) {
   const slope = (tanRet - rf) / Math.max(tanVol, 1e-12);
   const pts = [];
   for (let i=0;i<n;i++){
-    const x = (xMax * i)/(n-1);            // σ from 0 to xMax
-    const y = rf + slope * x;              // μ on the CML
+    const x = (xMax * i)/(n-1);
+    const y = rf + slope * x;
     pts.push({ x, y });
   }
   return pts;
@@ -321,6 +339,7 @@ $('#btnCompute').addEventListener('click', async () => {
     const rf = Number($('#rf').value) || 0;
     const gamma = Number($('#gamma').value);
     const nFrontier = Math.max(20, Number($('#nFrontier').value));
+    const longOnly = $('#longOnly').checked;
 
     const { tickers, prices } = parseCSVToMatrix(text);
     if (prices.length < 3) throw new Error('Need at least 3 rows of prices.');
@@ -328,26 +347,29 @@ $('#btnCompute').addEventListener('click', async () => {
     const { cov, mean: m } = covarianceMatrix(R);
     const { muA, sigA } = scaleAnnual(m, cov, freq);
 
-    // === Compute γ-portfolio first (uses μ - r_f) ===
+    // === Gamma (uses μ - r_f), then enforce long-only if requested ===
     const muExcess = muA.map(u => u - rf);
     let wG = optimalWeightsGivenGamma(muExcess, sigA, gamma);
-    if (GROSS_LEV_CAP) wG = scaleToGross(wG, GROSS_LEV_CAP);
+    if (longOnly) wG = enforceLongOnly(wG);
     const statsG = portfolioStats(wG, muA, sigA);
 
-    // === Tangency + CML ===
-    const { wT, ret: tanRet, vol: tanVol, sharpe: tanSharpe } = tangencyPortfolio(muA, sigA, rf);
+    // === Tangency ===
+    const { wT, ret: tanRet, vol: tanVol, sharpe: tanSharpe } =
+      tangencyPortfolio(muA, sigA, rf, longOnly);
 
     // === MVP ===
-    const wM = mvpWeights(sigA);
+    let wM = mvpWeights(sigA);
+    if (longOnly) wM = enforceLongOnly(wM);
 
-    // === Frontier (now guaranteed to include γ and Tangency returns) ===
-    const frontPts = efficientFrontier(muA, sigA, nFrontier, { includeMu: [statsG.ret, tanRet], margin: 0.35 });
+    // === Frontier (ensure it covers γ and Tangency returns) ===
+    const frontPts = efficientFrontier(muA, sigA, nFrontier,
+      { includeMu: [statsG.ret, tanRet], margin: 0.35, longOnly });
 
-    // === CML range covers frontier & γ point ===
+    // === CML (visual only) ===
     const maxSigma = Math.max(tanVol, statsG.vol, ...frontPts.map(p => p.s)) * 1.05;
     const cmlPts = makeCMLPoints(rf, tanVol, tanRet, maxSigma, 100);
 
-    // Save for downloads
+    // Save for downloads (show long-only feasible weights)
     weightsGamma = tickers.map((t,i) => ({ Asset: t, Weight: wG[i] }));
     weightsTan   = tickers.map((t,i) => ({ Asset: t, Weight: wT[i] }));
     weightsMVP   = tickers.map((t,i) => ({ Asset: t, Weight: wM[i] }));
@@ -368,9 +390,9 @@ $('#btnCompute').addEventListener('click', async () => {
 
     // Stats text
     $('#pfStats').textContent =
-      `Optimal (γ=${gamma}):  E[μ]=${(statsG.ret*100).toFixed(2)}%  |  σ=${(statsG.vol*100).toFixed(2)}%  |  Sharpe≈${((statsG.ret - rf)/Math.max(statsG.vol,1e-9)).toFixed(2)}`;
+      `Optimal (γ=${gamma}${longOnly? ", long-only":""}):  E[μ]=${(statsG.ret*100).toFixed(2)}%  |  σ=${(statsG.vol*100).toFixed(2)}%  |  Sharpe≈${((statsG.ret - rf)/Math.max(statsG.vol,1e-9)).toFixed(2)}`;
     $('#tanStats').textContent =
-      `Tangency:  E[μ]=${(tanRet*100).toFixed(2)}%  |  σ=${(tanVol*100).toFixed(2)}%  |  Sharpe=${tanSharpe.toFixed(2)}  |  rf=${(rf*100).toFixed(2)}%`;
+      `Tangency${longOnly? " (projected long-only)":""}:  E[μ]=${(tanRet*100).toFixed(2)}%  |  σ=${(tanVol*100).toFixed(2)}%  |  Sharpe=${tanSharpe.toFixed(2)}  |  rf=${(rf*100).toFixed(2)}%`;
 
     // Plot
     const data = {
